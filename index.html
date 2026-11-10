@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Dad's Nutrition</title>
 <meta name="description" content="Daily food and nutrition tracker">
 <link rel="manifest" href="manifest.webmanifest">
@@ -55,8 +55,10 @@
   --shadow: none; color-scheme: dark;
 }
 
-html { -webkit-text-size-adjust: 100%; height: 100%; }
-body { margin: 0; min-height: 100%; overscroll-behavior-y: none; }
+html { -webkit-text-size-adjust: 100%; height: 100%; overflow-x: hidden; touch-action: pan-y; }
+body { margin: 0; min-height: 100%; overflow-x: hidden; overscroll-behavior: none; touch-action: pan-y; }
+input, select, textarea, button { touch-action: manipulation; }
+input, select, textarea { max-width: 100%; }
 img { max-width: 100%; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -161,7 +163,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .edit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; justify-content: space-between; }
 .time-in {
   height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
-  font: inherit; font-size: 15px; padding: 0 10px; min-width: 0;
+  font: inherit; font-size: 16px; padding: 0 10px; min-width: 0;
 }
 .log-empty { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .log-empty strong { display: block; color: var(--fg); font-size: 15px; margin-bottom: 2px; }
@@ -190,11 +192,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .field .unit { position: relative; }
 .field .unit input { padding-right: 46px; }
 .field .unit span { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.form, .detail { min-width: 0; max-width: 100%; }
 .more-btn { align-self: flex-start; color: var(--muted); font-weight: 600; font-size: 14px; padding: 4px 0; }
 .check { font-size: 13px; color: var(--muted); }
 .check.warn { color: var(--warn); }
-.time-field { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+.time-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }
+input[type="time"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; text-align: left; }
+input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
 /* Bottom bar */
 .bottom {
@@ -251,7 +256,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .search::-webkit-search-cancel-button { display: none; }
 .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%; color: var(--muted); font-size: 18px; }
 
-.sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.sheet-body { flex: 1; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 .group-label {
   font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
   padding-top: 16px; padding-bottom: 4px;
@@ -277,7 +282,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .detail { padding-top: 16px; display: flex; flex-direction: column; gap: 16px; }
 .detail h3 { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; overflow-wrap: anywhere; }
 .detail .brand { color: var(--muted); font-size: 14px; margin-top: 4px; }
-.amount { display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
+.amount { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; }
 .amount input, .amount select {
   height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2);
   color: var(--fg); font: inherit; font-size: 16px; padding: 0 12px; min-width: 0; width: 100%;
@@ -1097,6 +1102,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 })();
 </script>
 <script>
+["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+  document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+});
+document.addEventListener("touchmove", function (e) { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
     navigator.serviceWorker.register("sw.js").catch(function () {});
