@@ -34,6 +34,10 @@
   --carbs: #2F7FE6;
   --fat: #E4A200;
   --fiber: #24A066;
+  --good: #1E9A58;
+  --mid: #E0A100;
+  --bad: #D63A42;
+  --low: #7C4DDB;
   --warn: #C2410C;
   --shadow: 0 1px 2px rgba(18,22,28,.05), 0 4px 16px rgba(18,22,28,.04);
   --font-display: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
@@ -45,6 +49,7 @@
     --bg: #0D1015; --surface: #161A21; --surface-2: #1E232C; --fg: #F1F3F6; --muted: #98A1B2;
     --line: #262C36; --ink: #F1F3F6; --on-ink: #0D1015; --track: #252B35;
     --protein: #F0646A; --carbs: #5B9BF0; --fat: #F0B92E; --fiber: #3BBE80; --warn: #F2804A;
+    --good: #36B873; --mid: #F0B92E; --bad: #EE5A62; --low: #9C7BF0;
     --shadow: none; color-scheme: dark;
   }
 }
@@ -52,6 +57,7 @@
   --bg: #0D1015; --surface: #161A21; --surface-2: #1E232C; --fg: #F1F3F6; --muted: #98A1B2;
   --line: #262C36; --ink: #F1F3F6; --on-ink: #0D1015; --track: #252B35;
   --protein: #F0646A; --carbs: #5B9BF0; --fat: #F0B92E; --fiber: #3BBE80; --warn: #F2804A;
+  --good: #36B873; --mid: #F0B92E; --bad: #EE5A62; --low: #9C7BF0;
   --shadow: none; color-scheme: dark;
 }
 
@@ -76,7 +82,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   max-width: 480px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(104px + env(safe-area-inset-bottom, 0px));
+  padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(100px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; gap: 14px;
 }
 
@@ -309,6 +315,85 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .detail-foot { position: sticky; bottom: 0; background: linear-gradient(to top, var(--surface) 75%, transparent); padding-top: 12px; }
 .loading-line { font-size: 12px; color: var(--muted); }
 
+
+/* Tab bar */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.tabbar-in { max-width: 448px; margin: 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 0; }
+.tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tab[aria-current="page"] { color: var(--fg); }
+.tab-log { height: 50px; padding: 0 24px; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-weight: 600; font-size: 16px; display: inline-flex; align-items: center; gap: 6px; }
+.tab-log .plus { font-size: 22px; font-weight: 500; line-height: 1; margin-top: -1px; }
+
+/* Day header */
+.top-nav { display: flex; gap: 8px; flex: none; }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-size: 22px; line-height: 1; }
+.icon-btn:disabled { opacity: .3; cursor: default; }
+.today-link { color: var(--carbs); font-weight: 600; font-size: 13px; padding: 2px 0; }
+.cal { position: relative; }
+.cal .sample { position: absolute; top: 12px; right: 12px; font-size: 10px; padding: 4px 8px; }
+
+/* Day complete */
+.complete { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.complete p { margin: 0; color: var(--muted); font-size: 13px; }
+.btn-outline { height: 48px; width: 100%; border-radius: 14px; border: 1.5px solid var(--line); font-weight: 600; font-size: 15px; }
+.done-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.status-pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); flex: none; }
+.link-btn { color: var(--muted); font-weight: 600; font-size: 14px; padding: 6px 2px; }
+
+/* Calendar */
+.cal-page { display: flex; flex-direction: column; gap: 14px; }
+.page-title { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; padding-top: 4px; }
+.seg3 { grid-template-columns: repeat(3, 1fr); }
+.period { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.period h2 { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 700; text-align: center; flex: 1; }
+.month { padding: 14px 10px 12px; }
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 6px; }
+.wd { text-align: center; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--muted); padding-bottom: 4px; }
+.dcell { display: grid; place-items: center; padding: 2px 0; }
+.dcell .c { width: 38px; height: 38px; max-width: 100%; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+.s-good .c { background: var(--good); color: #fff; }
+.s-mid .c { background: var(--mid); color: #1B1405; }
+.s-bad .c { background: var(--bad); color: #fff; }
+.s-low .c { background: var(--low); color: #fff; }
+.s-open .c { box-shadow: inset 0 0 0 2px var(--muted); }
+.dcell.today .c { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.dcell.sel .c { outline: 2px solid var(--ink); outline-offset: 2px; }
+.dcell.future { opacity: .3; pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13px; color: var(--muted); padding: 0 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend b { color: var(--fg); font-weight: 600; }
+.week { padding: 4px 0; }
+.wrow { width: 100%; display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); text-align: left; }
+.wrow:first-child { border-top: 0; }
+.wrow .wday b { display: block; font-size: 15px; }
+.wrow .wday small { color: var(--muted); font-size: 12px; }
+.wrow .wbar { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wrow .wbar span { font-size: 12.5px; color: var(--muted); }
+.wrow .wk { text-align: right; font-weight: 600; white-space: nowrap; }
+.wrow .wk small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
+.wrow .bar i { background: var(--c); }
+.summary { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.summary .v { font-size: 20px; font-weight: 700; }
+.summary .k { font-size: 12px; color: var(--muted); }
+.day-hero { padding: 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+.day-hero .big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.day-hero .big small { font-family: var(--font-body); font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
+.day-hero .diff { color: var(--muted); font-size: 14px; }
+.mini-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.mini-grid .v { font-size: 17px; font-weight: 700; }
+.mini-grid .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.mini-list { list-style: none; margin: 0; padding: 0; }
+.mini-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+.mini-list li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.mini-list li small { color: var(--muted); margin-right: 6px; }
+
 /* Toast */
 .toast {
   position: fixed; left: 50%; z-index: 60; bottom: calc(92px + env(safe-area-inset-bottom, 0px));
@@ -326,16 +411,21 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 </head>
 <body>
 
-<div class="app">
+<div class="app" id="dayPage">
   <header class="top">
     <div>
-      <h1>Today</h1>
+      <h1 id="dayTitle">Today</h1>
       <div class="date" id="date"></div>
+      <button class="today-link" type="button" id="todayLink" hidden>Back to today</button>
     </div>
-    <span class="chip" title="Targets are placeholders until Dad's real goals are set">Sample targets</span>
+    <div class="top-nav">
+      <button class="icon-btn" type="button" id="prevDay" aria-label="Previous day">‹</button>
+      <button class="icon-btn" type="button" id="nextDay" aria-label="Next day">›</button>
+    </div>
   </header>
 
   <section class="card cal" aria-label="Calories">
+    <span class="chip sample" title="Targets are placeholders until Dad's real goals are set">Sample target</span>
     <div class="ring-wrap">
       <svg viewBox="0 0 120 120" aria-hidden="true">
         <circle class="ring-track" cx="60" cy="60" r="52"></circle>
@@ -357,13 +447,40 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
   <div class="section-h"><h2>Logged food</h2><span id="itemCount"></span></div>
   <div id="meals"></div>
+  <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note">Targets are samples until Dad's goals are set.<br>Food data from USDA FoodData Central.<br><span id="appVersion">Version 6</span></p>
+  <p class="foot-note">Targets are samples until Dad's goals are set.<br>Food data from USDA FoodData Central.<br><span id="appVersion">Version 7</span></p>
 </div>
 
-<div class="bottom">
-  <button class="log-btn" type="button" id="logBtn"><span class="plus">+</span> Log food</button>
+<div class="app cal-page" id="calPage" hidden>
+  <h1 class="page-title">Calendar</h1>
+  <div class="seg seg3" id="calSeg" role="group" aria-label="Calendar view">
+    <button type="button" data-cview="day" aria-pressed="false">Day</button>
+    <button type="button" data-cview="week" aria-pressed="false">Week</button>
+    <button type="button" data-cview="month" aria-pressed="true">Month</button>
+  </div>
+  <div id="calBody"></div>
+  <div class="legend" aria-label="Color key">
+    <span><i class="status-dot" style="--c:var(--good)"></i>At or under target</span>
+    <span><i class="status-dot" style="--c:var(--mid)"></i>Up to 250 over</span>
+    <span><i class="status-dot" style="--c:var(--bad)"></i>More than 250 over</span>
+    <span><i class="status-dot" style="--c:var(--low)"></i>Ate too little</span>
+    <span><i class="status-dot" style="--c:var(--track);box-shadow:inset 0 0 0 2px var(--muted)"></i>Not marked complete</span>
+  </div>
+  <p class="foot-note">Only days marked complete get a color.</p>
 </div>
+
+<nav class="tabbar" aria-label="Main">
+  <div class="tabbar-in">
+    <button class="tab" type="button" data-tab="day" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"></path></svg>Today
+    </button>
+    <button class="tab-log" type="button" id="logBtn"><span class="plus">+</span> Log food</button>
+    <button class="tab" type="button" data-tab="cal">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>Calendar
+    </button>
+  </div>
+</nav>
 
 <div class="scrim" id="scrim" hidden></div>
 <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
@@ -394,6 +511,8 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
   // ---------- Settings ----------
   var TARGETS = { kcal: 2000, protein: 150, carbs: 200, fat: 67, fiber: 30 }; // samples until Dad's goals are set
+  var FLOOR_KCAL = 1500;   // under this on a completed day = ate too little (purple). Placeholder.
+  var OVER_YELLOW = 250;   // up to this many kcal over target = yellow, beyond = red
   var API_KEY = "mW7hWGzTbNFGcDbCPKpmcfgq6NFwfgTRdcnzqJqT";
   var API = "https://api.nal.usda.gov/fdc/v1";
   var STORE_KEY = "dads-nutrition-v2";
@@ -542,16 +661,56 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
             if (!validTime(e.time)) e.time = OLD_MEAL_TIME[e.meal] || "12:00";
             delete e.meal;
           });
+          if (!s.days || typeof s.days !== "object") s.days = {};
           return s;
         }
       }
     } catch (e) {}
-    return { version: 2, entries: [] };
+    return { version: 2, entries: [], days: {} };
   }
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast("Couldn't save on this phone. Storage may be full."); } }
   try { localStorage.removeItem("dads-nutrition-preview-v1"); } catch (e) {}
   function nextId() { return state.entries.reduce(function (m, e) { return Math.max(m, e.id); }, 0) + 1; }
-  function todays() { var k = dayKey(); return state.entries.filter(function (e) { return e.date === k; }); }
+  function entriesFor(k) { return state.entries.filter(function (e) { return e.date === k; }); }
+  var selectedDate = dayKey();
+
+  // ---------- Dates ----------
+  function parseKey(k) { var a = k.split("-"); return new Date(+a[0], +a[1] - 1, +a[2]); }
+  function addDays(k, n) { var d = parseKey(k); d.setDate(d.getDate() + n); return dayKey(d); }
+  function longDate(k) { return parseKey(k).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }); }
+  function shortDate(k) { return parseKey(k).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+  function dayName(k) {
+    var t = dayKey();
+    if (k === t) return "Today";
+    if (k === addDays(t, -1)) return "Yesterday";
+    return parseKey(k).toLocaleDateString("en-US", { weekday: "long" });
+  }
+
+  // ---------- Day status (colors) ----------
+  var STATUS = {
+    good: { label: "On target", color: "var(--good)" },
+    mid:  { label: "A little over", color: "var(--mid)" },
+    bad:  { label: "Over target", color: "var(--bad)" },
+    low:  { label: "Ate too little", color: "var(--low)" },
+    open: { label: "Not marked complete", color: "var(--muted)" },
+    none: { label: "Nothing logged", color: "var(--track)" }
+  };
+  function statusFor(kcal, target, complete, hasEntries) {
+    if (!complete) return hasEntries ? "open" : "none";
+    kcal = Math.round(kcal);
+    if (kcal < FLOOR_KCAL) return "low";
+    if (kcal <= target) return "good";
+    if (kcal <= target + OVER_YELLOW) return "mid";
+    return "bad";
+  }
+  function dayInfo(k) {
+    var list = entriesFor(k);
+    var t = totals(list);
+    var d = state.days[k] || {};
+    var target = d.target || TARGETS.kcal;
+    return { key: k, list: list, totals: t, kcal: t.kcal, target: target, complete: !!d.complete, status: statusFor(t.kcal, target, !!d.complete, list.length > 0) };
+  }
+  window.__nutritionTest.statusFor = statusFor;
 
   // ---------- Home screen ----------
   var expanded = null;
@@ -559,12 +718,17 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   $("ring").style.strokeDasharray = CIRC.toFixed(2);
 
   function render() {
-    var list = todays();
+    var list = entriesFor(selectedDate);
     var t = totals(list);
     var left = TARGETS.kcal - t.kcal;
     var pct = t.kcal / TARGETS.kcal;
 
-    $("date").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    var isToday = selectedDate === dayKey();
+    $("dayTitle").textContent = dayName(selectedDate);
+    $("date").textContent = longDate(selectedDate);
+    $("todayLink").hidden = isToday;
+    $("nextDay").disabled = isToday;
+    renderComplete();
     var ring = $("ring");
     ring.style.strokeDashoffset = (CIRC * (1 - Math.min(pct, 1))).toFixed(2);
     ring.classList.toggle("over", left < 0);
@@ -619,7 +783,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
             '</div>' : '') +
             '</li>';
         }).join("") + '</ul>'
-      : '<div class="log-empty"><strong>Nothing logged today</strong>Tap Log food to add a meal or a snack.</div>') + '</section>';
+      : '<div class="log-empty"><strong>Nothing logged ' + (selectedDate === dayKey() ? 'today' : 'this day') + '</strong>Tap Log food to add a meal or a snack.</div>') + '</section>';
   }
 
   function stepFor(e) { return isRawUnit(e.unitLabel) ? (e.unitLabel === "g" || e.unitLabel === "ml" ? 10 : 0.5) : 0.5; }
@@ -952,7 +1116,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   }
 
   function logEntry(fields) {
-    var e = Object.assign({ id: nextId(), date: dayKey(), kind: sheetKind, time: validTime(sheetTime) ? sheetTime : nowHHMM() }, fields);
+    var e = Object.assign({ id: nextId(), date: selectedDate, kind: sheetKind, time: validTime(sheetTime) ? sheetTime : nowHHMM() }, fields);
     state.entries.push(e);
     save();
     expanded = null;
@@ -1132,7 +1296,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
     scrim.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
   })();
 
-  $("logBtn").addEventListener("click", function () { openSheet(); });
+  $("logBtn").addEventListener("click", function () { if (currentTab !== "day") showTab("day"); openSheet(); });
   $("doneBtn").addEventListener("click", closeSheet);
   $("backBtn").addEventListener("click", backToSearch);
   $("scrim").addEventListener("click", closeSheet);
@@ -1165,10 +1329,176 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
     toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2000);
   }
 
+  // ---------- Day complete ----------
+  function renderComplete() {
+    var box = $("completeBox");
+    var info = dayInfo(selectedDate);
+    if (!info.list.length && !info.complete) { box.hidden = true; return; }
+    box.hidden = false;
+    if (!info.complete) {
+      box.innerHTML = '<button class="btn-outline" type="button" id="completeBtn">Mark day complete</button>' +
+        '<p>Tap this when you are done eating for the day. It colors the day on the calendar.</p>';
+    } else {
+      var st = STATUS[info.status];
+      box.innerHTML = '<div class="done-row"><span class="status-pill"><span class="status-dot" style="--c:' + st.color + '"></span>' +
+        'Day complete · ' + st.label + '</span><button class="link-btn" type="button" id="reopenBtn">Undo</button></div>' +
+        '<p>' + fmt(info.kcal) + ' of ' + fmt(info.target) + ' kcal.' + (info.status === "low" ? ' Under ' + fmt(FLOOR_KCAL) + ' kcal is too little to fuel the day.' : '') + '</p>';
+    }
+  }
+  var COMPLETE_MSG = { good: "Day complete. On target!", mid: "Day complete. Just a little over.", bad: "Day complete. Tomorrow is a fresh start.", low: "Day complete. That was too little food." };
+  $("completeBox").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    if (b.id === "completeBtn") {
+      state.days[selectedDate] = { complete: true, target: TARGETS.kcal };
+      save(); render();
+      toast(COMPLETE_MSG[dayInfo(selectedDate).status] || "Day complete");
+    } else if (b.id === "reopenBtn") {
+      delete state.days[selectedDate];
+      save(); render();
+    }
+  });
+
+  // ---------- Day navigation ----------
+  function goDay(k) {
+    if (k > dayKey()) return;
+    selectedDate = k; expanded = null; render(); window.scrollTo(0, 0);
+  }
+  $("prevDay").addEventListener("click", function () { goDay(addDays(selectedDate, -1)); });
+  $("nextDay").addEventListener("click", function () { goDay(addDays(selectedDate, 1)); });
+  $("todayLink").addEventListener("click", function () { goDay(dayKey()); });
+
+  // ---------- Tabs ----------
+  var currentTab = "day";
+  function showTab(t) {
+    currentTab = t;
+    $("dayPage").hidden = t !== "day";
+    $("calPage").hidden = t !== "cal";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
+      if (b.dataset.tab === t) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    if (t === "cal") { calDate = selectedDate; renderCalendar(); } else render();
+    window.scrollTo(0, 0);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
+    b.addEventListener("click", function () { showTab(b.dataset.tab); });
+  });
+
+  // ---------- Calendar ----------
+  var calView = "month";
+  var calDate = dayKey();
+  function weekStart(k) { var d = parseKey(k); d.setDate(d.getDate() - d.getDay()); return dayKey(d); }
+  function monthStart(k) { var d = parseKey(k); return dayKey(new Date(d.getFullYear(), d.getMonth(), 1)); }
+
+  function periodHtml(label, canNext) {
+    return '<div class="period"><button class="icon-btn" type="button" data-cnav="-1" aria-label="Previous">‹</button><h2>' + esc(label) + '</h2>' +
+      '<button class="icon-btn" type="button" data-cnav="1" aria-label="Next"' + (canNext ? '' : ' disabled') + '>›</button></div>';
+  }
+  function countsHtml(infos) {
+    var c = { good: 0, mid: 0, bad: 0, low: 0 }, done = 0, sum = 0, logged = 0;
+    infos.forEach(function (i) { if (c[i.status] != null) { c[i.status]++; done++; } if (i.list.length) { logged++; sum += i.kcal; } });
+    return '<section class="card summary">' +
+      '<div><div class="v num" style="color:var(--good)">' + c.good + '</div><div class="k">On target</div></div>' +
+      '<div><div class="v num">' + (logged ? fmt(sum / logged) : "–") + '</div><div class="k">Average kcal (logged days)</div></div>' +
+      '<div><div class="v num">' + done + '</div><div class="k">Days complete</div></div>' +
+      '<div><div class="v num">' + (c.mid + c.bad) + ' <span style="font-size:13px;font-weight:500;color:var(--muted)">over</span> · ' + c.low + ' <span style="font-size:13px;font-weight:500;color:var(--muted)">low</span></div><div class="k">Other completed days</div></div>' +
+      '</section>';
+  }
+
+  function renderMonth() {
+    var start = parseKey(monthStart(calDate));
+    var today = dayKey();
+    var y = start.getFullYear(), m = start.getMonth();
+    var days = new Date(y, m + 1, 0).getDate();
+    var canNext = dayKey(new Date(y, m + 1, 1)) <= today;
+    var html = periodHtml(start.toLocaleDateString("en-US", { month: "long", year: "numeric" }), canNext);
+    html += '<section class="card month"><div class="month-grid">' +
+      ["S", "M", "T", "W", "T", "F", "S"].map(function (d) { return '<div class="wd">' + d + '</div>'; }).join("");
+    for (var b = 0; b < start.getDay(); b++) html += '<div></div>';
+    var infos = [];
+    for (var d = 1; d <= days; d++) {
+      var k = dayKey(new Date(y, m, d));
+      var info = dayInfo(k); if (k <= today) infos.push(info);
+      var cls = "dcell s-" + info.status + (k === today ? " today" : "") + (k === calDate ? " sel" : "") + (k > today ? " future" : "");
+      html += '<button class="' + cls + '" type="button" data-day="' + k + '" aria-label="' + esc(longDate(k) + ": " + STATUS[info.status].label) + '"><span class="c">' + d + '</span></button>';
+    }
+    html += '</div></section>' + countsHtml(infos);
+    return html;
+  }
+
+  function renderWeek() {
+    var ws = weekStart(calDate), today = dayKey();
+    var we = addDays(ws, 6);
+    var html = periodHtml(shortDate(ws) + " – " + shortDate(we), addDays(ws, 7) <= today);
+    var infos = [];
+    html += '<section class="card week">';
+    for (var i = 0; i < 7; i++) {
+      var k = addDays(ws, i), info = dayInfo(k), st = STATUS[info.status];
+      var future = k > today; if (!future) infos.push(info);
+      var color = info.complete ? st.color : "var(--muted)";
+      html += '<button class="wrow" type="button" data-day="' + k + '"' + (future ? ' disabled style="opacity:.35"' : '') + '>' +
+        '<span class="wday"><b>' + parseKey(k).toLocaleDateString("en-US", { weekday: "short" }) + '</b><small>' + shortDate(k) + '</small></span>' +
+        '<span class="wbar"><span class="bar" style="--c:' + color + '"><i style="width:' + Math.min(100, info.kcal / info.target * 100).toFixed(1) + '%"></i></span>' +
+        '<span><span class="status-dot" style="--c:' + (info.status === "none" ? "var(--track)" : st.color) + ';display:inline-block;width:8px;height:8px;margin-right:6px"></span>' + (future ? "" : st.label) + '</span></span>' +
+        '<span class="wk num">' + (info.list.length ? fmt(info.kcal) : "–") + '<small>of ' + fmt(info.target) + '</small></span>' +
+        '</button>';
+    }
+    html += '</section>' + countsHtml(infos);
+    return html;
+  }
+
+  function renderCalDay() {
+    var info = dayInfo(calDate), st = STATUS[info.status];
+    var html = periodHtml(longDate(calDate), calDate < dayKey());
+    var diff = info.target - info.kcal;
+    var diffText = !info.list.length ? "Nothing logged on this day." :
+      (diff >= 0 ? fmt(diff) + " kcal under target" : fmt(-diff) + " kcal over target") + (info.complete ? "" : " so far");
+    html += '<section class="card day-hero">' +
+      '<span class="status-pill"><span class="status-dot" style="--c:' + st.color + '"></span>' + (info.complete ? "Day complete · " : "") + st.label + '</span>' +
+      '<div class="big num">' + fmt(info.kcal) + '<small>of ' + fmt(info.target) + ' kcal</small></div>' +
+      '<div class="diff">' + diffText + '</div>' +
+      '<div class="mini-grid">' + MACROS.map(function (m) {
+        return '<div><div class="v num">' + fmt(info.totals[m.key]) + '<span style="font-size:12px"> g</span></div><div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div></div>';
+      }).join("") + '</div>' +
+      '</section>';
+    if (info.list.length) {
+      html += '<section class="card" style="padding:4px 0"><ul class="mini-list">' + info.list.slice().sort(byTime).map(function (e) {
+        return '<li><span><small>' + esc(fmtTime(e.time)) + '</small>' + esc(e.name) + '</span><span class="num">' + fmt(entryValue(e, "kcal")) + '</span></li>';
+      }).join("") + '</ul></section>';
+    }
+    html += '<button class="btn-outline" type="button" data-open="1">' + (info.list.length ? "Open this day to edit" : "Log food for this day") + '</button>';
+    return html;
+  }
+
+  function renderCalendar() {
+    Array.prototype.forEach.call($("calSeg").querySelectorAll("button"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.cview === calView)); });
+    $("calBody").innerHTML = '<div class="cal-page" style="gap:14px">' + (calView === "month" ? renderMonth() : calView === "week" ? renderWeek() : renderCalDay()) + '</div>';
+  }
+
+  $("calSeg").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-cview]"); if (!b) return;
+    calView = b.dataset.cview; renderCalendar();
+  });
+  $("calBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b || b.disabled) return;
+    if (b.dataset.cnav) {
+      var n = +b.dataset.cnav;
+      if (calView === "month") { var d = parseKey(monthStart(calDate)); d.setMonth(d.getMonth() + n); calDate = dayKey(d); if (calDate > dayKey()) calDate = dayKey(); }
+      else if (calView === "week") { calDate = addDays(calDate, 7 * n); if (calDate > dayKey()) calDate = dayKey(); }
+      else { var nk = addDays(calDate, n); if (nk <= dayKey()) calDate = nk; }
+      renderCalendar(); return;
+    }
+    if (b.dataset.day) { calDate = b.dataset.day; calView = "day"; renderCalendar(); window.scrollTo(0, 0); return; }
+    if (b.dataset.open) { selectedDate = calDate; expanded = null; showTab("day"); }
+  });
+
   // New day while the app stays open
   var lastDay = dayKey();
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden && dayKey() !== lastDay) { lastDay = dayKey(); expanded = null; render(); }
+    if (!document.hidden && dayKey() !== lastDay) {
+      if (selectedDate === lastDay) selectedDate = dayKey();
+      lastDay = dayKey(); expanded = null;
+      if (currentTab === "cal") renderCalendar(); else render();
+    }
   });
 
   render();
