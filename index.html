@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dad's Nutrition</title>
+<meta name="description" content="Daily food and nutrition tracker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nutrition">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F3F5F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1015" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
+<style>
+/* Layout: one phone-width column. Calorie ring on top, macro tiles, meals, fixed "Log food" bar at the bottom. */
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F5;
+  --fg: #12161C;
+  --muted: #677084;
+  --line: #E1E5EB;
+  --ink: #12161C;
+  --on-ink: #FFFFFF;
+  --track: #E6EAF0;
+  --protein: #E0484F;
+  --carbs: #2F7FE6;
+  --fat: #E4A200;
+  --fiber: #24A066;
+  --warn: #C2410C;
+  --shadow: 0 1px 2px rgba(18,22,28,.05), 0 4px 16px rgba(18,22,28,.04);
+  --font-display: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius: 18px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1015; --surface: #161A21; --surface-2: #1E232C; --fg: #F1F3F6; --muted: #98A1B2;
+    --line: #262C36; --ink: #F1F3F6; --on-ink: #0D1015; --track: #252B35;
+    --protein: #F0646A; --carbs: #5B9BF0; --fat: #F0B92E; --fiber: #3BBE80; --warn: #F2804A;
+    --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1015; --surface: #161A21; --surface-2: #1E232C; --fg: #F1F3F6; --muted: #98A1B2;
+  --line: #262C36; --ink: #F1F3F6; --on-ink: #0D1015; --track: #252B35;
+  --protein: #F0646A; --carbs: #5B9BF0; --fat: #F0B92E; --fiber: #3BBE80; --warn: #F2804A;
+  --shadow: none; color-scheme: dark;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-height: 100%; overscroll-behavior-y: none; }
+img { max-width: 100%; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--carbs); outline-offset: 2px; }
+.num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+
+.app {
+  max-width: 480px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(104px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+/* Header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.top h1 { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.top .date { color: var(--muted); font-size: 14px; font-weight: 500; }
+.chip {
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 6px 10px; white-space: nowrap;
+}
+
+.card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+/* Calories */
+.cal { padding: 20px 18px 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.ring-wrap { position: relative; width: 200px; max-width: 100%; aspect-ratio: 1; }
+.ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: var(--track); stroke-width: 11; }
+.ring-fill { fill: none; stroke: var(--ink); stroke-width: 11; stroke-linecap: round; transition: stroke-dashoffset .5s ease, stroke .3s; }
+.ring-fill.over { stroke: var(--warn); }
+.ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.ring-center .big { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.ring-center .big.over { color: var(--warn); }
+.ring-center .lbl { color: var(--muted); font-size: 13px; font-weight: 500; margin-top: 6px; }
+.cal-stats { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); padding-top: 14px; }
+.cal-stats div { text-align: center; }
+.cal-stats .v { font-size: 19px; font-weight: 700; }
+.cal-stats .k { color: var(--muted); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+
+/* Macros */
+.macros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.macro { padding: 14px 14px 13px; text-align: left; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.macro .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.macro .name { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; }
+.macro .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.macro .chev { color: var(--muted); font-size: 18px; line-height: 1; }
+.macro .amt { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.macro .amt small { font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.bar { height: 7px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--c); transition: width .5s ease; }
+.macro .left { font-size: 12px; color: var(--muted); }
+.macro .left.over { color: var(--warn); font-weight: 600; }
+
+/* Meals */
+.section-h { display: flex; align-items: baseline; justify-content: space-between; margin: 6px 2px -4px; }
+.section-h h2 { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.section-h span { color: var(--muted); font-size: 13px; }
+.meal { padding: 4px 0; }
+.meal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px 8px 16px; }
+.meal-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.meal-head .kcal { color: var(--muted); font-size: 13px; margin-left: 8px; font-weight: 500; }
+.add-btn {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600;
+  padding: 8px 12px; border-radius: 999px; background: var(--surface-2);
+}
+.items { list-style: none; margin: 0; padding: 0 0 6px; }
+.item { border-top: 1px solid var(--line); margin-left: 16px; }
+.item-main { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 16px 11px 0; text-align: left; }
+.item-main .t { min-width: 0; }
+.item-main .n { font-weight: 500; overflow-wrap: anywhere; }
+.item-main .s { color: var(--muted); font-size: 13px; }
+.item-main .k { font-weight: 600; white-space: nowrap; }
+.item-edit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 12px 0; }
+.stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-2); border-radius: 999px; padding: 4px; }
+.stepper button { width: 36px; height: 36px; border-radius: 50%; font-size: 20px; font-weight: 600; background: var(--surface); }
+.stepper .q { min-width: 52px; text-align: center; font-weight: 600; }
+.remove { color: var(--warn); font-weight: 600; font-size: 14px; padding: 8px 4px; }
+.empty { color: var(--muted); font-size: 14px; padding: 0 16px 14px; margin: 0; }
+
+.foot-note { color: var(--muted); font-size: 12px; text-align: center; margin: 4px 0 0; }
+.foot-note button { text-decoration: underline; color: var(--muted); font-size: 12px; }
+
+/* Bottom bar */
+.bottom {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+  padding-top: 18px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.log-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; max-width: 448px; margin: 0 auto; height: 56px; border-radius: 16px;
+  background: var(--ink); color: var(--on-ink); font-size: 17px; font-weight: 600;
+}
+.log-btn .plus { font-size: 24px; font-weight: 500; line-height: 1; }
+
+/* Add-food sheet */
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(8,10,14,.45); opacity: 0; transition: opacity .2s; }
+.scrim.show { opacity: 1; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  max-width: 520px; margin: 0 auto; max-height: 86%;
+  background: var(--surface); border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column;
+  transform: translateY(100%); transition: transform .25s ease;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.sheet.show { transform: translateY(0); }
+.sheet-head {
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--line);
+}
+.grab { width: 40px; height: 5px; border-radius: 999px; background: var(--line); margin: 0 auto; }
+.sheet-title { display: flex; align-items: center; justify-content: space-between; }
+.sheet-title h2 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+.done { font-weight: 600; padding: 8px 4px; }
+.meal-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.meal-chips button {
+  padding: 8px 14px; border-radius: 999px; background: var(--surface-2); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.meal-chips button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.search {
+  width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--fg); padding: 0 14px; font: inherit; font-size: 16px;
+}
+.food-list { list-style: none; margin: 0; padding: 4px 0 12px; overflow-y: auto; }
+.food {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid var(--line);
+}
+.food .t { flex: 1; min-width: 0; }
+.food .n { font-weight: 500; }
+.food .m { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
+.food .m b { font-weight: 600; }
+.food .m .p { color: var(--protein); } .food .m .c { color: var(--carbs); } .food .m .f { color: var(--fat); }
+.food .k { font-weight: 600; white-space: nowrap; }
+.food .add { width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-size: 20px; flex: none; }
+.sheet-note { color: var(--muted); font-size: 12px; padding: 10px 16px 0; margin: 0; }
+
+/* Toast */
+.toast {
+  position: fixed; left: 50%; z-index: 60; bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+  background: var(--ink); color: var(--on-ink); padding: 10px 16px; border-radius: 12px;
+  font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); text-align: center;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.sheet.show ~ .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Today</h1>
+      <div class="date" id="date"></div>
+    </div>
+    <span class="chip" title="Targets are placeholders until Dad's real goals are set">Sample targets</span>
+  </header>
+
+  <section class="card cal" aria-label="Calories">
+    <div class="ring-wrap">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+        <circle class="ring-fill" id="ring" cx="60" cy="60" r="52"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="big num" id="calLeft">0</div>
+        <div class="lbl" id="calLeftLbl">kcal left</div>
+      </div>
+    </div>
+    <div class="cal-stats">
+      <div><div class="v num" id="calEaten">0</div><div class="k">Eaten</div></div>
+      <div><div class="v num" id="calTarget">0</div><div class="k">Target</div></div>
+      <div><div class="v num" id="calPct">0%</div><div class="k">Of goal</div></div>
+    </div>
+  </section>
+
+  <section class="macros" id="macros" aria-label="Macros"></section>
+
+  <div class="section-h"><h2>Meals</h2><span id="itemCount"></span></div>
+  <div id="meals" style="display:flex;flex-direction:column;gap:10px"></div>
+
+  <p class="foot-note">Preview build. Foods and targets are sample data. <button type="button" id="resetBtn">Reset sample day</button></p>
+</div>
+
+<div class="bottom">
+  <button class="log-btn" type="button" id="logBtn"><span class="plus">+</span> Log food</button>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-head">
+    <div class="grab"></div>
+    <div class="sheet-title">
+      <h2 id="sheetTitle">Add food</h2>
+      <button class="done" type="button" id="doneBtn">Done</button>
+    </div>
+    <div class="meal-chips" id="mealChips" role="group" aria-label="Meal"></div>
+    <input class="search" id="search" type="search" placeholder="Search foods" autocomplete="off" aria-label="Search foods">
+  </div>
+  <p class="sheet-note">Sample foods with approximate values. Real food search comes in step 2.</p>
+  <ul class="food-list" id="foodList"></ul>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  // Sample targets (placeholders until Dad's goals are known)
+  var TARGETS = { kcal: 2000, protein: 150, carbs: 200, fat: 67, fiber: 30 };
+
+  // Sample foods, approximate values per serving
+  var FOODS = [
+    { id: "yogurt",  name: "Greek yogurt, plain nonfat", serving: "1 cup",        kcal: 130, protein: 23,  carbs: 9,   fat: 0.7,  fiber: 0 },
+    { id: "egg",     name: "Egg, large",                 serving: "1 egg",        kcal: 72,  protein: 6.3, carbs: 0.4, fat: 4.8,  fiber: 0 },
+    { id: "oats",    name: "Oatmeal, cooked",            serving: "1 cup",        kcal: 166, protein: 5.9, carbs: 28,  fat: 3.6,  fiber: 4 },
+    { id: "banana",  name: "Banana",                     serving: "1 medium",     kcal: 105, protein: 1.3, carbs: 27,  fat: 0.4,  fiber: 3.1 },
+    { id: "chicken", name: "Chicken breast, cooked",     serving: "4 oz",         kcal: 187, protein: 35,  carbs: 0,   fat: 4,    fiber: 0 },
+    { id: "rice",    name: "Brown rice, cooked",         serving: "1 cup",        kcal: 248, protein: 5.5, carbs: 52,  fat: 2,    fiber: 3.2 },
+    { id: "broc",    name: "Broccoli, cooked",           serving: "1 cup",        kcal: 55,  protein: 3.7, carbs: 11,  fat: 0.6,  fiber: 5.1 },
+    { id: "salmon",  name: "Salmon, cooked",             serving: "4 oz",         kcal: 233, protein: 25,  carbs: 0,   fat: 14,   fiber: 0 },
+    { id: "avocado", name: "Avocado",                    serving: "1/2 fruit",    kcal: 120, protein: 1.5, carbs: 6.4, fat: 11,   fiber: 5 },
+    { id: "bread",   name: "Whole wheat bread",          serving: "1 slice",      kcal: 80,  protein: 4,   carbs: 14,  fat: 1,    fiber: 2 },
+    { id: "almonds", name: "Almonds",                    serving: "1 oz (23 nuts)", kcal: 164, protein: 6, carbs: 6,   fat: 14,   fiber: 3.5 },
+    { id: "apple",   name: "Apple",                      serving: "1 medium",     kcal: 95,  protein: 0.5, carbs: 25,  fat: 0.3,  fiber: 4.4 },
+    { id: "beans",   name: "Black beans, cooked",        serving: "1/2 cup",      kcal: 114, protein: 7.6, carbs: 20,  fat: 0.5,  fiber: 7.5 },
+    { id: "oil",     name: "Olive oil",                  serving: "1 tbsp",       kcal: 119, protein: 0,   carbs: 0,   fat: 13.5, fiber: 0 }
+  ];
+  var FOOD_BY_ID = {};
+  FOODS.forEach(function (f) { FOOD_BY_ID[f.id] = f; });
+
+  var MEALS = ["Breakfast", "Lunch", "Dinner", "Snacks"];
+  var MACROS = [
+    { key: "protein", label: "Protein", color: "var(--protein)" },
+    { key: "carbs",   label: "Carbs",   color: "var(--carbs)" },
+    { key: "fat",     label: "Fat",     color: "var(--fat)" },
+    { key: "fiber",   label: "Fiber",   color: "var(--fiber)" }
+  ];
+
+  var SAMPLE_DAY = [
+    { id: 1, food: "yogurt",  meal: "Breakfast", qty: 1 },
+    { id: 2, food: "banana",  meal: "Breakfast", qty: 1 },
+    { id: 3, food: "egg",     meal: "Breakfast", qty: 2 },
+    { id: 4, food: "chicken", meal: "Lunch",     qty: 1 },
+    { id: 5, food: "rice",    meal: "Lunch",     qty: 1 },
+    { id: 6, food: "broc",    meal: "Lunch",     qty: 1 },
+    { id: 7, food: "almonds", meal: "Snacks",    qty: 1 }
+  ];
+
+  var STORE_KEY = "dads-nutrition-preview-v1";
+  var entries = load();
+  var expanded = null;
+  var sheetMeal = defaultMeal();
+
+  function clone(a) { return JSON.parse(JSON.stringify(a)); }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter(function (e) { return FOOD_BY_ID[e.food]; });
+      }
+    } catch (e) {}
+    return clone(SAMPLE_DAY);
+  }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); } catch (e) {} }
+
+  function defaultMeal() {
+    var h = new Date().getHours();
+    return h < 11 ? "Breakfast" : h < 16 ? "Lunch" : h < 21 ? "Dinner" : "Snacks";
+  }
+  function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+  function fmtQty(q) { return (q % 1 === 0 ? q : q.toFixed(1)) + ""; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function totals(list) {
+    var t = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+    list.forEach(function (e) {
+      var f = FOOD_BY_ID[e.food];
+      for (var k in t) t[k] += f[k] * e.qty;
+    });
+    return t;
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var CIRC = 2 * Math.PI * 52;
+  $("ring").style.strokeDasharray = CIRC.toFixed(2);
+
+  function render() {
+    var t = totals(entries);
+    var left = TARGETS.kcal - t.kcal;
+    var pct = t.kcal / TARGETS.kcal;
+
+    $("date").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    var ring = $("ring");
+    ring.style.strokeDashoffset = (CIRC * (1 - Math.min(pct, 1))).toFixed(2);
+    ring.classList.toggle("over", left < 0);
+    $("calLeft").textContent = fmt(Math.abs(left));
+    $("calLeft").classList.toggle("over", left < 0);
+    $("calLeftLbl").textContent = left < 0 ? "kcal over" : "kcal left";
+    $("calEaten").textContent = fmt(t.kcal);
+    $("calTarget").textContent = fmt(TARGETS.kcal);
+    $("calPct").textContent = Math.round(pct * 100) + "%";
+
+    $("macros").innerHTML = MACROS.map(function (m) {
+      var v = t[m.key], goal = TARGETS[m.key], rem = goal - v;
+      return '<button class="card macro" type="button" data-macro="' + m.key + '" style="--c:' + m.color + '">' +
+        '<div class="row"><span class="name"><span class="dot"></span>' + m.label + '</span><span class="chev" aria-hidden="true">›</span></div>' +
+        '<div class="amt num">' + fmt(v) + ' <small>/ ' + goal + ' g</small></div>' +
+        '<div class="bar"><i style="width:' + Math.min(100, v / goal * 100).toFixed(1) + '%"></i></div>' +
+        '<div class="left' + (rem < 0 ? ' over' : '') + '">' + (rem < 0 ? fmt(-rem) + ' g over' : fmt(rem) + ' g left') + '</div>' +
+        '</button>';
+    }).join("");
+
+    $("itemCount").textContent = entries.length + (entries.length === 1 ? " item" : " items");
+
+    $("meals").innerHTML = MEALS.map(function (meal) {
+      var list = entries.filter(function (e) { return e.meal === meal; });
+      var mk = totals(list).kcal;
+      var body = list.length
+        ? '<ul class="items">' + list.map(function (e) {
+            var f = FOOD_BY_ID[e.food];
+            var open = expanded === e.id;
+            return '<li class="item">' +
+              '<button class="item-main" type="button" data-toggle="' + e.id + '" aria-expanded="' + open + '">' +
+                '<span class="t"><div class="n">' + esc(f.name) + '</div><div class="s">' + fmtQty(e.qty) + ' × ' + esc(f.serving) + '</div></span>' +
+                '<span class="k num">' + fmt(f.kcal * e.qty) + '</span>' +
+              '</button>' +
+              (open ? '<div class="item-edit">' +
+                '<div class="stepper"><button type="button" data-dec="' + e.id + '" aria-label="Less">−</button><span class="q num">' + fmtQty(e.qty) + '</span><button type="button" data-inc="' + e.id + '" aria-label="More">+</button></div>' +
+                '<button class="remove" type="button" data-remove="' + e.id + '">Remove</button>' +
+              '</div>' : '') +
+              '</li>';
+          }).join("") + '</ul>'
+        : '<p class="empty">Nothing logged yet.</p>';
+      return '<section class="card meal">' +
+        '<div class="meal-head"><h3>' + meal + (mk ? '<span class="kcal num">' + fmt(mk) + ' kcal</span>' : '') + '</h3>' +
+        '<button class="add-btn" type="button" data-add="' + meal + '">+ Add</button></div>' + body + '</section>';
+    }).join("");
+  }
+
+  // Meal list interactions
+  $("meals").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button");
+    if (!b) return;
+    var id;
+    if (b.dataset.add) { openSheet(b.dataset.add); return; }
+    if (b.dataset.toggle) { id = +b.dataset.toggle; expanded = expanded === id ? null : id; render(); return; }
+    if (b.dataset.inc || b.dataset.dec) {
+      id = +(b.dataset.inc || b.dataset.dec);
+      var e = entries.find(function (x) { return x.id === id; });
+      if (!e) return;
+      e.qty = Math.max(0.5, Math.round((e.qty + (b.dataset.inc ? 0.5 : -0.5)) * 2) / 2);
+      save(); render(); return;
+    }
+    if (b.dataset.remove) {
+      id = +b.dataset.remove;
+      var gone = entries.find(function (x) { return x.id === id; });
+      entries = entries.filter(function (x) { return x.id !== id; });
+      expanded = null; save(); render();
+      if (gone) toast("Removed " + FOOD_BY_ID[gone.food].name.split(",")[0].toLowerCase());
+    }
+  });
+
+  $("macros").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-macro]");
+    if (!b) return;
+    var label = b.querySelector(".name").textContent;
+    toast(label + " details come in step 4");
+  });
+
+  // Add-food sheet
+  function renderChips() {
+    $("mealChips").innerHTML = MEALS.map(function (m) {
+      return '<button type="button" data-meal="' + m + '" aria-pressed="' + (m === sheetMeal) + '">' + m + '</button>';
+    }).join("");
+  }
+  function renderFoods() {
+    var q = $("search").value.trim().toLowerCase();
+    var list = FOODS.filter(function (f) { return !q || f.name.toLowerCase().indexOf(q) !== -1; });
+    $("foodList").innerHTML = list.length ? list.map(function (f) {
+      return '<li><button class="food" type="button" data-food="' + f.id + '">' +
+        '<span class="t"><div class="n">' + esc(f.name) + '</div>' +
+        '<div class="m"><span>' + esc(f.serving) + '</span><span class="p"><b>P</b> ' + Math.round(f.protein) + 'g</span><span class="c"><b>C</b> ' + Math.round(f.carbs) + 'g</span><span class="f"><b>F</b> ' + Math.round(f.fat) + 'g</span></div></span>' +
+        '<span class="k num">' + f.kcal + '</span><span class="add" aria-hidden="true">+</span>' +
+        '</button></li>';
+    }).join("") : '<li><p class="empty" style="padding-top:14px">No sample food matches "' + esc(q) + '".</p></li>';
+  }
+  function openSheet(meal) {
+    sheetMeal = meal || defaultMeal();
+    $("search").value = "";
+    renderChips(); renderFoods();
+    $("scrim").hidden = false; $("sheet").hidden = false;
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      $("scrim").classList.add("show"); $("sheet").classList.add("show");
+    }); });
+  }
+  function closeSheet() {
+    $("scrim").classList.remove("show"); $("sheet").classList.remove("show");
+    setTimeout(function () { $("scrim").hidden = true; $("sheet").hidden = true; }, 260);
+  }
+  $("logBtn").addEventListener("click", function () { openSheet(); });
+  $("doneBtn").addEventListener("click", closeSheet);
+  $("scrim").addEventListener("click", closeSheet);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("sheet").hidden) closeSheet(); });
+  $("mealChips").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-meal]"); if (!b) return;
+    sheetMeal = b.dataset.meal; renderChips();
+  });
+  $("search").addEventListener("input", renderFoods);
+  $("foodList").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-food]"); if (!b) return;
+    var f = FOOD_BY_ID[b.dataset.food];
+    var nextId = entries.reduce(function (m, e) { return Math.max(m, e.id); }, 0) + 1;
+    var same = entries.find(function (e) { return e.food === f.id && e.meal === sheetMeal; });
+    if (same) same.qty += 1; else entries.push({ id: nextId, food: f.id, meal: sheetMeal, qty: 1 });
+    save(); render();
+    toast("Added " + f.name.split(",")[0].toLowerCase() + " to " + sheetMeal.toLowerCase());
+  });
+
+  $("resetBtn").addEventListener("click", function () {
+    entries = clone(SAMPLE_DAY); expanded = null; save(); render(); toast("Sample day restored");
+  });
+
+  var toastTimer;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("show"); }, 1800);
+  }
+
+  render();
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
