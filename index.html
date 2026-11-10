@@ -358,7 +358,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   <div class="section-h"><h2>Logged food</h2><span id="itemCount"></span></div>
   <div id="meals"></div>
 
-  <p class="foot-note">Targets are samples until Dad's goals are set.<br>Food data from USDA FoodData Central.</p>
+  <p class="foot-note">Targets are samples until Dad's goals are set.<br>Food data from USDA FoodData Central.<br><span id="appVersion">Version 6</span></p>
 </div>
 
 <div class="bottom">
@@ -1040,6 +1040,20 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   }
 
   // ---------- Sheet open / close ----------
+  var lockedY = null;
+  function lockPage() {
+    if (lockedY !== null) return;
+    lockedY = window.scrollY || 0;
+    var b = document.body.style;
+    b.position = "fixed"; b.top = -lockedY + "px"; b.left = "0"; b.right = "0"; b.width = "100%"; b.overflow = "hidden";
+  }
+  function unlockPage() {
+    if (lockedY === null) return;
+    var b = document.body.style;
+    b.position = b.top = b.left = b.right = b.width = b.overflow = "";
+    window.scrollTo(0, lockedY);
+    lockedY = null;
+  }
   function openSheet() {
     sheetKind = "meal";
     sheetTime = nowHHMM();
@@ -1047,7 +1061,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
     results = null; current = null;
     renderKind(); showView("search"); renderSearchBody();
     $("scrim").hidden = false; $("sheet").hidden = false;
-    document.body.style.overflow = "hidden";
+    lockPage();
     requestAnimationFrame(function () { requestAnimationFrame(function () {
       $("scrim").classList.add("show"); $("sheet").classList.add("show");
     }); });
@@ -1059,7 +1073,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
     if (detailCtrl) detailCtrl.abort();
     $("search").blur();
     $("scrim").classList.remove("show"); $("sheet").classList.remove("show");
-    document.body.style.overflow = "";
+    unlockPage();
     setTimeout(function () { $("scrim").hidden = true; $("sheet").hidden = true; }, 260);
   }
 
