@@ -149,6 +149,53 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
 .foot-note { color: var(--muted); font-size: 12px; text-align: center; margin: 4px 0 0; }
 
+/* Logged food rows */
+.log-card { padding: 2px 0; }
+.log-card .items { padding: 0; }
+.log-card .item:first-child { border-top: 0; }
+.when { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.tag { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+.tag.meal { background: var(--ink); color: var(--on-ink); }
+.tag.snack { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
+.item-edit { flex-wrap: wrap; }
+.edit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; justify-content: space-between; }
+.time-in {
+  height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+  font: inherit; font-size: 15px; padding: 0 10px; min-width: 0;
+}
+.log-empty { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.log-empty strong { display: block; color: var(--fg); font-size: 15px; margin-bottom: 2px; }
+
+/* Meal / Snack switch */
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { height: 38px; border-radius: 9px; font-weight: 600; font-size: 15px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg.small { width: 170px; }
+.seg.small button { height: 34px; font-size: 14px; }
+
+/* Custom food */
+.custom-entry { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); text-align: left; }
+.custom-entry .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; font-size: 18px; flex: none; }
+.custom-entry .t { flex: 1; min-width: 0; }
+.custom-entry .n { font-weight: 600; }
+.custom-entry .m { color: var(--muted); font-size: 13px; }
+.form { display: flex; flex-direction: column; gap: 14px; padding-top: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.field input {
+  height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+  font: inherit; font-size: 16px; padding: 0 14px; width: 100%; min-width: 0;
+}
+.field input.big { font-family: var(--font-display); font-weight: 700; font-size: 22px; }
+.field .unit { position: relative; }
+.field .unit input { padding-right: 46px; }
+.field .unit span { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.more-btn { align-self: flex-start; color: var(--muted); font-weight: 600; font-size: 14px; padding: 4px 0; }
+.check { font-size: 13px; color: var(--muted); }
+.check.warn { color: var(--warn); }
+.time-field { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+
 /* Bottom bar */
 .bottom {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
@@ -301,8 +348,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
   <section class="macros" id="macros" aria-label="Macros"></section>
 
-  <div class="section-h"><h2>Meals</h2><span id="itemCount"></span></div>
-  <div class="meals" id="meals"></div>
+  <div class="section-h"><h2>Logged food</h2><span id="itemCount"></span></div>
+  <div id="meals"></div>
 
   <p class="foot-note">Targets are samples until Dad's goals are set.<br>Food data from USDA FoodData Central.</p>
 </div>
@@ -320,7 +367,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
       <h2 id="sheetTitle">Add food</h2>
       <button class="done" type="button" id="doneBtn">Done</button>
     </div>
-    <div class="meal-chips" id="mealChips" role="group" aria-label="Meal"></div>
+    <div class="seg" id="kindSeg" role="group" aria-label="Meal or snack">
+      <button type="button" data-kind="meal" aria-pressed="true">Meal</button>
+      <button type="button" data-kind="snack" aria-pressed="false">Snack</button>
+    </div>
     <div class="search-wrap" id="searchWrap">
       <input class="search" id="search" type="search" placeholder="Search foods, like banana or Fage yogurt" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Search foods">
       <button class="clear" type="button" id="clearBtn" aria-label="Clear search" hidden>✕</button>
@@ -341,7 +391,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   var API = "https://api.nal.usda.gov/fdc/v1";
   var STORE_KEY = "dads-nutrition-v2";
 
-  var MEALS = ["Breakfast", "Lunch", "Dinner", "Snacks"];
+  var KINDS = { meal: "Meal", snack: "Snack" };
+  var OLD_MEAL_TIME = { Breakfast: "08:00", Lunch: "12:30", Dinner: "18:30", Snacks: "15:00" };
   var MACROS = [
     { key: "protein", label: "Protein", color: "var(--protein)" },
     { key: "carbs",   label: "Carbs",   color: "var(--carbs)" },
@@ -364,7 +415,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   function fmtQty(q) { return (Math.round(q * 100) / 100).toString(); }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function dayKey(d) { d = d || new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
-  function defaultMeal() { var h = new Date().getHours(); return h < 11 ? "Breakfast" : h < 16 ? "Lunch" : h < 21 ? "Dinner" : "Snacks"; }
+  function nowHHMM() { var d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function validTime(t) { return /^\d{2}:\d{2}$/.test(t || ""); }
+  function fmtTime(t) {
+    if (!validTime(t)) return "";
+    var h = +t.slice(0, 2), m = t.slice(3, 5);
+    return (h % 12 || 12) + ":" + m + " " + (h < 12 ? "AM" : "PM");
+  }
+  function byTime(a, b) { return (a.time || "").localeCompare(b.time || "") || a.id - b.id; }
+  function parseNum(v) { var n = parseFloat(String(v).replace(",", ".")); return isFinite(n) && n >= 0 ? n : null; }
 
   function niceName(s) {
     s = String(s || "").trim();
@@ -453,19 +512,31 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
     list.forEach(function (e) { for (var k in t) t[k] += entryValue(e, k); });
     return t;
   }
-  function servingText(e) { return isRawUnit(e.unitLabel) ? fmtQty(e.qty) + " " + e.unitLabel : fmtQty(e.qty) + " × " + e.unitLabel; }
+  function servingText(e) {
+    if (e.unitLabel === "serving") return fmtQty(e.qty) + (e.qty === 1 ? " serving" : " servings");
+    return isRawUnit(e.unitLabel) ? fmtQty(e.qty) + " " + e.unitLabel : fmtQty(e.qty) + " × " + e.unitLabel;
+  }
 
   // Exposed for automated checks only
   window.__nutritionTest = { per100FromMap: per100FromMap, mapFromSearch: mapFromSearch, mapFromDetail: mapFromDetail, buildUnits: buildUnits, totals: totals, niceName: niceName, servingText: servingText };
 
   // ---------- Storage ----------
   var state = load();
+  if (state.entries.length) save(); // keep migrated entries
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var s = JSON.parse(raw);
-        if (s && Array.isArray(s.entries)) return s;
+        if (s && Array.isArray(s.entries)) {
+          // Older entries used Breakfast/Lunch/Dinner/Snacks: turn them into Meal/Snack with a time
+          s.entries.forEach(function (e) {
+            if (!e.kind) e.kind = e.meal === "Snacks" ? "snack" : "meal";
+            if (!validTime(e.time)) e.time = OLD_MEAL_TIME[e.meal] || "12:00";
+            delete e.meal;
+          });
+          return s;
+        }
       }
     } catch (e) {}
     return { version: 2, entries: [] };
@@ -508,43 +579,57 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
         '</button>';
     }).join("");
 
-    $("itemCount").textContent = list.length ? list.length + (list.length === 1 ? " item" : " items") : "";
+    var meals = list.filter(function (e) { return e.kind !== "snack"; }).length;
+    var snacks = list.length - meals;
+    $("itemCount").textContent = list.length ? [meals ? meals + (meals === 1 ? " meal" : " meals") : "", snacks ? snacks + (snacks === 1 ? " snack" : " snacks") : ""].filter(Boolean).join(" · ") : "";
 
-    $("meals").innerHTML = MEALS.map(function (meal) {
-      var ml = list.filter(function (e) { return e.meal === meal; });
-      var mk = totals(ml).kcal;
-      var body = ml.length
-        ? '<ul class="items">' + ml.map(function (e) {
-            var open = expanded === e.id;
-            return '<li class="item">' +
-              '<button class="item-main" type="button" data-toggle="' + e.id + '" aria-expanded="' + open + '">' +
-                '<span class="t"><div class="n">' + esc(e.name) + '</div><div class="s">' + esc(servingText(e)) + (e.brand ? ' · ' + esc(e.brand) : '') + '</div></span>' +
-                '<span class="k num">' + fmt(entryValue(e, "kcal")) + '</span>' +
-              '</button>' +
-              (open ? '<div class="item-edit">' +
+    var sorted = list.slice().sort(byTime);
+    $("meals").innerHTML = '<section class="card log-card">' + (sorted.length
+      ? '<ul class="items">' + sorted.map(function (e) {
+          var open = expanded === e.id;
+          var kind = e.kind === "snack" ? "snack" : "meal";
+          return '<li class="item">' +
+            '<button class="item-main" type="button" data-toggle="' + e.id + '" aria-expanded="' + open + '">' +
+              '<span class="t">' +
+                '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(e.time)) + '</span></div>' +
+                '<div class="n">' + esc(e.name) + '</div>' +
+                '<div class="s">' + esc(servingText(e)) + (e.brand ? ' · ' + esc(e.brand) : '') + '</div>' +
+              '</span>' +
+              '<span class="k num">' + fmt(entryValue(e, "kcal")) + '</span>' +
+            '</button>' +
+            (open ? '<div class="item-edit">' +
+              '<div class="edit-row">' +
                 '<div class="stepper"><button type="button" data-dec="' + e.id + '" aria-label="Less">−</button><span class="q num">' + fmtQty(e.qty) + '</span><button type="button" data-inc="' + e.id + '" aria-label="More">+</button></div>' +
+                '<input class="time-in" type="time" data-time="' + e.id + '" value="' + esc(e.time || "") + '" aria-label="Time eaten">' +
+              '</div>' +
+              '<div class="edit-row">' +
+                '<div class="seg small" role="group" aria-label="Meal or snack">' +
+                  '<button type="button" data-setkind="meal" data-id="' + e.id + '" aria-pressed="' + (kind === "meal") + '">Meal</button>' +
+                  '<button type="button" data-setkind="snack" data-id="' + e.id + '" aria-pressed="' + (kind === "snack") + '">Snack</button>' +
+                '</div>' +
                 '<button class="remove" type="button" data-remove="' + e.id + '">Remove</button>' +
-              '</div>' : '') +
-              '</li>';
-          }).join("") + '</ul>'
-        : '<p class="empty">Nothing logged yet.</p>';
-      return '<section class="card meal">' +
-        '<div class="meal-head"><h3>' + meal + (mk ? '<span class="kcal num">' + fmt(mk) + ' kcal</span>' : '') + '</h3>' +
-        '<button class="add-btn" type="button" data-add="' + meal + '">+ Add</button></div>' + body + '</section>';
-    }).join("");
+              '</div>' +
+            '</div>' : '') +
+            '</li>';
+        }).join("") + '</ul>'
+      : '<div class="log-empty"><strong>Nothing logged today</strong>Tap Log food to add a meal or a snack.</div>') + '</section>';
   }
 
   function stepFor(e) { return isRawUnit(e.unitLabel) ? (e.unitLabel === "g" || e.unitLabel === "ml" ? 10 : 0.5) : 0.5; }
+  function findEntry(id) { return state.entries.find(function (x) { return x.id === id; }); }
 
   $("meals").addEventListener("click", function (ev) {
     var b = ev.target.closest("button");
     if (!b) return;
     var id, e;
-    if (b.dataset.add) { openSheet(b.dataset.add); return; }
     if (b.dataset.toggle) { id = +b.dataset.toggle; expanded = expanded === id ? null : id; render(); return; }
+    if (b.dataset.setkind) {
+      e = findEntry(+b.dataset.id); if (!e) return;
+      e.kind = b.dataset.setkind; save(); render(); return;
+    }
     if (b.dataset.inc || b.dataset.dec) {
       id = +(b.dataset.inc || b.dataset.dec);
-      e = state.entries.find(function (x) { return x.id === id; });
+      e = findEntry(id);
       if (!e) return;
       var step = stepFor(e);
       e.qty = Math.max(step, Math.round((e.qty + (b.dataset.inc ? step : -step)) * 100) / 100);
@@ -552,11 +637,17 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
     }
     if (b.dataset.remove) {
       id = +b.dataset.remove;
-      e = state.entries.find(function (x) { return x.id === id; });
+      e = findEntry(id);
       state.entries = state.entries.filter(function (x) { return x.id !== id; });
       expanded = null; save(); render();
       if (e) toast("Removed " + e.name.split(",")[0]);
     }
+  });
+  $("meals").addEventListener("change", function (ev) {
+    var t = ev.target;
+    if (!t.dataset || !t.dataset.time) return;
+    var e = findEntry(+t.dataset.time);
+    if (e && validTime(t.value)) { e.time = t.value; save(); render(); }
   });
 
   $("macros").addEventListener("click", function (ev) {
@@ -566,22 +657,25 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   });
 
   // ---------- Add-food sheet ----------
-  var sheetMeal = defaultMeal();
-  var view = "search";       // "search" | "detail"
+  var sheetKind = "meal";    // "meal" | "snack"
+  var sheetTime = nowHHMM();
+  var view = "search";       // "search" | "detail" | "custom"
   var results = null;        // { query, generic: [], branded: [], error }
   var searchTimer = null, searchCtrl = null, detailCtrl = null;
   var current = null;        // food being viewed: { fdcId, name, brand, dataType, per100, nutrients, units, unitIndex, qty, loading }
 
-  function renderChips() {
-    $("mealChips").innerHTML = MEALS.map(function (m) {
-      return '<button type="button" data-meal="' + m + '" aria-pressed="' + (m === sheetMeal) + '">' + m + '</button>';
-    }).join("");
+  function renderKind() {
+    Array.prototype.forEach.call($("kindSeg").querySelectorAll("button"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.kind === sheetKind));
+    });
+    var add = $("addBtn");
+    if (add) add.textContent = "Log " + KINDS[sheetKind].toLowerCase();
   }
 
   function recents() {
     var seen = {}, out = [];
     state.entries.slice().sort(function (a, b) { return b.id - a.id; }).forEach(function (e) {
-      var k = (e.fdcId || e.name) + "|" + e.unitLabel;
+      var k = (e.custom ? "custom:" + e.name + "|" + e.per100.kcal : (e.fdcId || e.name)) + "|" + e.unitLabel;
       if (seen[k] || out.length >= 12) return;
       seen[k] = 1; out.push(e);
     });
@@ -598,21 +692,22 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   function renderSearchBody() {
     var q = $("search").value.trim();
     $("clearBtn").hidden = !q;
-    var html = "";
+    var html = '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
+      '<span class="t"><div class="n">Custom food</div><div class="m">Type your own calories and macros</div></span><span class="add" aria-hidden="true">›</span></button>';
     if (q.length < 2) {
       var rec = recents();
       if (rec.length) {
         html += '<div class="group-label">Recent</div><ul class="food-list">' +
           rec.map(function (e) { return foodRow('data-recent="' + e.id + '"', e.name, servingText(e) + (e.brand ? " · " + e.brand : ""), entryValue(e, "kcal"), "kcal"); }).join("") + '</ul>';
       } else {
-        html = '<div class="state"><strong>Search any food</strong>Try "banana", "chicken breast" or a brand like "Fage yogurt".</div>';
+        html += '<div class="state"><strong>Search any food</strong>Try "banana", "chicken breast" or a brand like "Fage yogurt".</div>';
       }
     } else if (!results || results.query !== q || results.loading) {
-      html = '<div class="state"><div class="spinner"></div>Searching…</div>';
+      html += '<div class="state"><div class="spinner"></div>Searching…</div>';
     } else if (results.error) {
-      html = '<div class="state"><strong>' + esc(results.error.title) + '</strong>' + esc(results.error.text) + '</div>';
+      html += '<div class="state"><strong>' + esc(results.error.title) + '</strong>' + esc(results.error.text) + '</div>';
     } else if (!results.generic.length && !results.branded.length) {
-      html = '<div class="state"><strong>No foods found</strong>Try fewer words or a different spelling.</div>';
+      html += '<div class="state"><strong>No foods found</strong>Try fewer words or a different spelling, or add it as a custom food.</div>';
     } else {
       if (results.generic.length) {
         html += '<div class="group-label">Common foods</div><ul class="food-list">' + results.generic.map(function (f, i) {
@@ -699,11 +794,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   // ---------- Food detail ----------
   function showView(v) {
     view = v;
-    var detail = v === "detail";
-    $("backBtn").hidden = !detail;
-    $("searchWrap").hidden = detail;
-    $("sheetTitle").textContent = detail ? "" : "Add food";
-    $("sheetTitle").hidden = detail;
+    $("backBtn").hidden = v === "search";
+    $("searchWrap").hidden = v !== "search";
+    $("sheetTitle").textContent = v === "custom" ? "Custom food" : "Add food";
+    $("sheetTitle").hidden = v === "detail";
   }
 
   function openDetailFromSearch(item) {
@@ -756,11 +850,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
   function openDetailFromEntry(e) {
     var units = [{ label: e.unitLabel, grams: e.unitGrams }];
-    var liquid = /\bml\b|fl oz/.test(e.unitLabel);
-    (liquid ? [{ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 }] : [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }])
-      .forEach(function (u) { if (u.label !== e.unitLabel) units.push(u); });
+    if (!e.custom) {
+      var liquid = /\bml\b|fl oz/.test(e.unitLabel);
+      (liquid ? [{ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 }] : [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }])
+        .forEach(function (u) { if (u.label !== e.unitLabel) units.push(u); });
+    }
     current = {
-      fdcId: e.fdcId, name: e.name, brand: e.brand || "", dataType: e.dataType || "",
+      fdcId: e.fdcId, name: e.name, brand: e.brand || "", dataType: e.dataType || "", custom: !!e.custom,
       per100: e.per100, nutrients: e.nutrients || {}, units: units, unitIndex: 0, qty: e.qty, loading: false, touched: true
     };
     showView("detail");
@@ -792,10 +888,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
             return '<option value="' + i + '"' + (i === current.unitIndex ? ' selected' : '') + '>' + esc(x.label) + '</option>';
           }).join("") + '</select>' +
         '</div>' +
+        timeFieldHtml() +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
-        '<div class="source">Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '') + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
-        '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + (qty > 0 ? '' : ' disabled') + '>Add to ' + sheetMeal + '</button></div>' +
+        '<div class="source">' + (current.custom ? 'Custom food you entered' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
+        '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + (qty > 0 ? '' : ' disabled') + '>Log ' + KINDS[sheetKind].toLowerCase() + '</button></div>' +
       '</div>';
+    bindTimeField();
 
     $("qtyInput").addEventListener("input", function () {
       var raw = this.value.replace(",", ".");
@@ -820,7 +918,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   function nutHtml(kcal, grams) {
     var p = current.per100;
     return '<div class="nut-kcal"><div class="v num">' + (kcal == null ? "–" : fmt(kcal)) + '<small>kcal</small></div>' +
-      '<div class="est">' + (p.est ? "Calories estimated from macros" : (grams ? fmtG(grams) + (/\bml\b|fl oz/.test(current.units[current.unitIndex].label) ? " ml" : " g") : "")) + '</div></div>' +
+      '<div class="est">' + (p.est ? "Calories estimated from macros" : current.custom ? "" : (grams ? fmtG(grams) + (/\bml\b|fl oz/.test(current.units[current.unitIndex].label) ? " ml" : " g") : "")) + '</div></div>' +
       '<div class="nut-grid">' +
         nutCell("Protein", "var(--protein)", amountFor(p, grams, "protein")) +
         nutCell("Carbs", "var(--carbs)", amountFor(p, grams, "carbs")) +
@@ -839,18 +937,92 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   function addCurrent() {
     if (!current || !(current.qty > 0)) return;
     var u = current.units[current.unitIndex];
-    state.entries.push({
-      id: nextId(), date: dayKey(), meal: sheetMeal,
-      fdcId: current.fdcId, name: current.name, brand: current.brand, dataType: current.dataType,
+    logEntry({
+      fdcId: current.fdcId, name: current.name, brand: current.brand, dataType: current.dataType, custom: current.custom || undefined,
       unitLabel: u.label, unitGrams: u.grams, qty: current.qty,
       per100: current.per100, nutrients: current.nutrients
     });
+  }
+
+  function logEntry(fields) {
+    var e = Object.assign({ id: nextId(), date: dayKey(), kind: sheetKind, time: validTime(sheetTime) ? sheetTime : nowHHMM() }, fields);
+    state.entries.push(e);
     save();
     expanded = null;
     render();
-    var name = current.name.split(",")[0];
     closeSheet();
-    toast("Added " + name + " to " + sheetMeal.toLowerCase());
+    toast("Logged " + e.name.split(",")[0] + " as a " + KINDS[e.kind].toLowerCase());
+  }
+
+  // ---------- Time field (shared by detail and custom) ----------
+  function timeFieldHtml() {
+    return '<div class="field"><label for="timeInput">Time eaten</label>' +
+      '<input class="time-in" id="timeInput" type="time" value="' + esc(sheetTime) + '" style="height:50px;font-size:16px"></div>';
+  }
+  function bindTimeField() {
+    var t = $("timeInput");
+    if (t) t.addEventListener("change", function () { if (validTime(this.value)) sheetTime = this.value; });
+  }
+
+  // ---------- Custom food ----------
+  var showMore = false;
+  function numField(id, label, unit, color, big) {
+    return '<div class="field"><label for="' + id + '">' + (color ? '<span class="dot" style="--c:' + color + '"></span>' : '') + label + '</label>' +
+      '<div class="unit"><input id="' + id + '" type="text" inputmode="decimal" autocomplete="off"' + (big ? ' class="big"' : '') + ' placeholder="0"><span>' + unit + '</span></div></div>';
+  }
+  function openCustom() {
+    current = null; showMore = false;
+    showView("custom");
+    $("sheetBody").innerHTML =
+      '<div class="form">' +
+        '<div class="field"><label for="cName">Name</label><input id="cName" type="text" autocomplete="off" placeholder="For example: chipotle bowl"></div>' +
+        numField("cKcal", "Calories", "kcal", "", true) +
+        '<div class="grid2">' + numField("cProtein", "Protein", "g", "var(--protein)") + numField("cCarbs", "Carbs", "g", "var(--carbs)") + '</div>' +
+        '<div class="grid2">' + numField("cFat", "Fat", "g", "var(--fat)") + numField("cFiber", "Fiber", "g", "var(--fiber)") + '</div>' +
+        '<button class="more-btn" type="button" id="moreBtn">+ More nutrients</button>' +
+        '<div class="grid2" id="moreFields" hidden>' + numField("cSugar", "Sugar", "g") + numField("cSat", "Saturated fat", "g") + numField("cSodium", "Sodium", "mg") + '</div>' +
+        '<div class="check" id="cCheck"></div>' +
+        timeFieldHtml() +
+        '<div class="detail-foot"><button class="primary" type="button" id="addBtn" disabled>Log ' + KINDS[sheetKind].toLowerCase() + '</button></div>' +
+      '</div>';
+    $("sheetBody").scrollTop = 0;
+    bindTimeField();
+    $("moreBtn").addEventListener("click", function () { $("moreFields").hidden = false; this.hidden = true; });
+    $("sheetBody").querySelector(".form").addEventListener("input", checkCustom);
+    $("addBtn").addEventListener("click", addCustom);
+    setTimeout(function () { var n = $("cName"); if (n) n.focus(); }, 280);
+  }
+  function customValues() {
+    return {
+      kcal: parseNum($("cKcal").value), protein: parseNum($("cProtein").value), carbs: parseNum($("cCarbs").value),
+      fat: parseNum($("cFat").value), fiber: parseNum($("cFiber").value),
+      sugar: parseNum($("cSugar").value), sat: parseNum($("cSat").value), sodium: parseNum($("cSodium").value)
+    };
+  }
+  function checkCustom() {
+    var v = customValues();
+    $("addBtn").disabled = v.kcal == null;
+    var el = $("cCheck");
+    if (v.protein == null && v.carbs == null && v.fat == null) { el.textContent = ""; el.className = "check"; return; }
+    var fromMacros = (v.protein || 0) * 4 + (v.carbs || 0) * 4 + (v.fat || 0) * 9;
+    var off = v.kcal != null && v.kcal > 0 && Math.abs(fromMacros - v.kcal) / v.kcal > 0.2 && Math.abs(fromMacros - v.kcal) > 40;
+    el.className = "check" + (off ? " warn" : "");
+    el.textContent = "Macros add up to about " + fmt(fromMacros) + " kcal." + (off ? " That's far from the calories above, so double-check the numbers." : "");
+  }
+  function addCustom() {
+    var v = customValues();
+    if (v.kcal == null) return;
+    var name = $("cName").value.trim() || "Custom food";
+    var nutrients = {};
+    if (v.sugar != null) nutrients[2000] = v.sugar;
+    if (v.sat != null) nutrients[1258] = v.sat;
+    if (v.sodium != null) nutrients[1093] = v.sodium;
+    logEntry({
+      custom: true, name: name, brand: "", dataType: "Custom",
+      unitLabel: "serving", unitGrams: 100, qty: 1,
+      per100: { kcal: v.kcal, protein: v.protein, carbs: v.carbs, fat: v.fat, fiber: v.fiber, est: false },
+      nutrients: nutrients
+    });
   }
 
   function backToSearch() {
@@ -861,11 +1033,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   }
 
   // ---------- Sheet open / close ----------
-  function openSheet(meal) {
-    sheetMeal = meal || defaultMeal();
+  function openSheet() {
+    sheetKind = "meal";
+    sheetTime = nowHHMM();
     $("search").value = "";
     results = null; current = null;
-    renderChips(); showView("search"); renderSearchBody();
+    renderKind(); showView("search"); renderSearchBody();
     $("scrim").hidden = false; $("sheet").hidden = false;
     document.body.style.overflow = "hidden";
     requestAnimationFrame(function () { requestAnimationFrame(function () {
@@ -886,15 +1059,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   $("backBtn").addEventListener("click", backToSearch);
   $("scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !$("sheet").hidden) { if (view === "detail") backToSearch(); else closeSheet(); }
+    if (e.key === "Escape" && !$("sheet").hidden) { if (view !== "search") backToSearch(); else closeSheet(); }
   });
-  $("mealChips").addEventListener("click", function (ev) {
-    var b = ev.target.closest("[data-meal]"); if (!b) return;
-    sheetMeal = b.dataset.meal; renderChips();
-    var add = $("addBtn"); if (add && view === "detail") add.textContent = "Add to " + sheetMeal;
+  $("kindSeg").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-kind]"); if (!b) return;
+    sheetKind = b.dataset.kind; renderKind();
   });
   $("sheetBody").addEventListener("click", function (ev) {
-    var b = ev.target.closest("[data-pick],[data-recent]"); if (!b) return;
+    var b = ev.target.closest("[data-pick],[data-recent],[data-custom]"); if (!b) return;
+    if (b.dataset.custom) { $("search").blur(); openCustom(); return; }
     if (b.dataset.recent) {
       var e = state.entries.find(function (x) { return x.id === +b.dataset.recent; });
       if (e) openDetailFromEntry(e);
