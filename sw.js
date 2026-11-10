@@ -1,5 +1,5 @@
 // Keeps the app working offline. Bump VERSION whenever the app files change.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = "dads-nutrition-" + VERSION;
 const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
@@ -17,6 +17,8 @@ self.addEventListener("activate", (e) => {
 // Network first, so updates show up right away; fall back to the cache when offline.
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  // Leave other sites (food database, fonts) to the browser
+  if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
