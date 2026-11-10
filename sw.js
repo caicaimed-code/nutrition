@@ -1,5 +1,5 @@
 // Keeps the app working offline. Bump VERSION whenever the app files change.
-const VERSION = "v7";
+const VERSION = "v8";
 const CACHE = "dads-nutrition-" + VERSION;
 const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
