@@ -235,7 +235,9 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .sheet-head { padding-top: 10px; padding-bottom: 12px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--line); flex: none; }
-.grab { width: 40px; height: 5px; border-radius: 999px; background: var(--line); margin: 0 auto; }
+.grab-zone { margin: -10px 0 -6px; padding: 10px 0 12px; display: flex; justify-content: center; cursor: grab; touch-action: none; }
+.grab { width: 44px; height: 5px; border-radius: 999px; background: var(--muted); opacity: .5; }
+.sheet.dragging, .scrim.dragging { transition: none !important; }
 .sheet-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
 .sheet-title h2 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; }
 .done, .back { font-weight: 600; padding: 8px 4px; }
@@ -366,7 +368,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 <div class="scrim" id="scrim" hidden></div>
 <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <div class="sheet-head pad-x">
-    <div class="grab"></div>
+    <div class="grab-zone" id="grabZone" aria-hidden="true"><div class="grab"></div></div>
     <div class="sheet-title">
       <button class="back" type="button" id="backBtn" hidden><span aria-hidden="true">‹</span> Back</button>
       <h2 id="sheetTitle">Add food</h2>
@@ -1051,6 +1053,8 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
     }); });
   }
   function closeSheet() {
+    $("sheet").classList.remove("dragging"); $("scrim").classList.remove("dragging");
+    $("sheet").style.transform = ""; $("scrim").style.opacity = "";
     if (searchCtrl) searchCtrl.abort();
     if (detailCtrl) detailCtrl.abort();
     $("search").blur();
@@ -1058,6 +1062,61 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
     document.body.style.overflow = "";
     setTimeout(function () { $("scrim").hidden = true; $("sheet").hidden = true; }, 260);
   }
+
+
+  // ---------- Swipe down to close ----------
+  (function () {
+    var sheet = $("sheet"), head = sheet.querySelector(".sheet-head"), body = $("sheetBody"), scrim = $("scrim");
+    var startY = 0, lastY = 0, lastT = 0, speed = 0, dy = 0, mode = null; // mode: null | "drag" | "scroll"
+
+    function begin(e, fromBody) {
+      if (e.touches.length !== 1) return;
+      startY = lastY = e.touches[0].clientY; lastT = Date.now(); speed = 0; dy = 0;
+      mode = fromBody ? null : "drag";
+    }
+    function move(e, fromBody) {
+      if (!e.touches.length) return;
+      var y = e.touches[0].clientY;
+      if (mode === null && fromBody) {
+        // From the list: only pull the sheet when already at the top and moving down
+        if (body.scrollTop <= 0 && y - startY > 6) { mode = "drag"; startY = y; }
+        else if (Math.abs(y - startY) > 6) mode = "scroll";
+      }
+      if (mode !== "drag") return;
+      e.preventDefault();
+      var now = Date.now();
+      speed = (y - lastY) / Math.max(1, now - lastT);
+      lastY = y; lastT = now;
+      dy = Math.max(0, y - startY);
+      if (document.activeElement && document.activeElement.blur && dy > 10) document.activeElement.blur();
+      sheet.classList.add("dragging"); scrim.classList.add("dragging");
+      sheet.style.transform = "translateY(" + dy + "px)";
+      scrim.style.opacity = String(Math.max(0, 1 - dy / (sheet.offsetHeight || 600)));
+    }
+    function end() {
+      if (mode === "drag") {
+        if (dy > 110 || speed > 0.6) closeSheet();
+        else {
+          sheet.classList.remove("dragging"); scrim.classList.remove("dragging");
+          sheet.style.transform = ""; scrim.style.opacity = "";
+        }
+      }
+      mode = null; dy = 0;
+    }
+    head.addEventListener("touchstart", function (e) {
+      if (e.target.closest("input, select, textarea")) { mode = "scroll"; return; }
+      begin(e, false);
+    }, { passive: true });
+    head.addEventListener("touchmove", function (e) { if (mode === "drag") move(e, false); else e.preventDefault(); }, { passive: false });
+    head.addEventListener("touchend", end);
+    head.addEventListener("touchcancel", end);
+    body.addEventListener("touchstart", function (e) { begin(e, true); }, { passive: true });
+    body.addEventListener("touchmove", function (e) { move(e, true); }, { passive: false });
+    body.addEventListener("touchend", end);
+    body.addEventListener("touchcancel", end);
+    // Never scroll the page behind the sheet
+    scrim.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+  })();
 
   $("logBtn").addEventListener("click", function () { openSheet(); });
   $("doneBtn").addEventListener("click", closeSheet);
