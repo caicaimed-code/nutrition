@@ -604,7 +604,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 20</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 21</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -2736,8 +2736,21 @@ select.in { padding-right: 30px;
     if (d.day) state.days[k] = d.day; else delete state.days[k];
   }
   function applyMain(m) {
+    var keep = state.settings && state.settings.sheet;
     state.settings = Object.assign(defaultSettings(), m.settings || {});
+    // A backup that never heard of the Google Sheet link must not wipe it (turning it off saves null, so that is different)
+    if (keep && !(m.settings && m.settings.sheet !== undefined)) state.settings.sheet = keep;
     state.weights = Array.isArray(m.weights) ? m.weights : [];
+  }
+  // Another phone connected the Google Sheet and this one has no answer yet: take its link
+  function adoptSheet(remote) {
+    var r = remote && remote.sheet;
+    if (!r || !r.url || !r.key || state.settings.sheet !== undefined) return false;
+    state.settings.sheet = { url: r.url, key: r.key };
+    gs = { sent: {} }; saveGs(); saveLocalOnly();
+    if ($("gsBody")) renderGs();
+    setTimeout(function () { if (window.__gsAfterSave) window.__gsAfterSave(); }, 300);
+    return true;
   }
   // Entries from another phone can share an id with one here: give repeats a new id
   function fixIds() {
@@ -2752,7 +2765,13 @@ select.in { padding-right: 30px;
   function pushChanges() {
     var uid = cloudUser.uid, jobs = [];
     var m = mainData(), mh = hashOf(m);
-    if (mh !== sync.mainBase) jobs.push(function () { return cloud.putMain(uid, m).then(function () { sync.mainBase = mh; saveSync(); }); });
+    if (mh !== sync.mainBase) jobs.push(function () {
+      // Look at the backup first so this phone never erases a Google Sheet link another phone saved
+      return cloud.getMain(uid).then(function (r) {
+        if (r && r.exists && adoptSheet(r.data && r.data.settings)) { m = mainData(); mh = hashOf(m); }
+        return cloud.putMain(uid, m);
+      }).then(function () { sync.mainBase = mh; saveSync(); });
+    });
     allDates().forEach(function (k) {
       var d = dayData(k), h = hashOf(d), b = (sync.base || {})[k] || EMPTY_DAY;
       if (h === b) return;
@@ -2805,6 +2824,7 @@ select.in { padding-right: 30px;
         var c = hashOf(main.data), l = hashOf(mainData());
         if (c === l) sync.mainBase = c;
         else if (l === sync.mainBase) { applyMain(main.data); sync.mainBase = c; changed = true; }
+        else if (adoptSheet(main.data && main.data.settings)) { changed = true; }
       }
       sync.seen = seen; saveSync();
       if (changed) { fixIds(); saveLocalOnly(); refreshAll(); }
@@ -3040,7 +3060,7 @@ select.in { padding-right: 30px;
       if (key.length < 8) { $("gsErr").hidden = false; $("gsErr").textContent = "Paste the key from the script."; return; }
       state.settings.sheet = { url: url, key: key }; gs = { sent: {} }; saveGs(); save(); renderGs(); gsRun();
     } else if (b.id === "gsAll") { gs.sent = {}; saveGs(); gsRun(); }
-    else if (b.id === "gsOff") { delete state.settings.sheet; gs = {}; saveGs(); save(); renderGs(); toast("Sheet copy turned off"); }
+    else if (b.id === "gsOff") { state.settings.sheet = null; gs = {}; saveGs(); save(); renderGs(); toast("Sheet copy turned off"); }
   });
   setTimeout(gsRun, 4000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) setTimeout(gsRun, 2500); });
