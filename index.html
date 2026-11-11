@@ -458,6 +458,50 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .pace .k { text-align: right; font-weight: 700; font-size: 18px; white-space: nowrap; }
 .pace .k small { display: block; font-family: var(--font-body); font-weight: 500; font-size: 11.5px; color: var(--muted); }
 .tag.aggr { background: var(--warn); color: #fff; margin-left: 6px; vertical-align: 2px; }
+/* ---------- Learn pages ---------- */
+.learn-top { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+.learn-back { font-weight: 600; font-size: 16px; padding: 8px 8px 8px 0; color: var(--fg); }
+.learn-hero { padding: 18px; }
+.learn-hero .kicker { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.learn-hero h1 { margin: 6px 0 8px; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.learn-hero .lead { margin: 0; font-size: 16px; line-height: 1.45; }
+.learn-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.learn-stats div { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.learn-stats .v { font-family: var(--font-display); font-weight: 800; font-size: 22px; }
+.learn-stats .v small { font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.learn-stats .k { font-size: 12.5px; color: var(--muted); }
+.learn-sec { overflow: hidden; }
+.learn-sec summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 16px 18px; }
+.learn-sec summary::-webkit-details-marker { display: none; }
+.learn-sec summary .t { flex: 1; min-width: 0; }
+.learn-sec summary b { display: block; font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.learn-sec summary small { display: block; color: var(--muted); font-size: 13.5px; margin-top: 2px; line-height: 1.35; }
+.learn-sec summary .chev { color: var(--muted); font-size: 20px; transition: transform .15s; }
+.learn-sec[open] summary .chev { transform: rotate(90deg); }
+.learn-body { padding: 0 18px 18px; font-size: 15px; line-height: 1.5; }
+.learn-body p { margin: 0 0 10px; }
+.learn-body ul { margin: 0 0 10px; padding-left: 20px; }
+.learn-body li { margin-bottom: 6px; }
+.learn-body .cite { color: var(--muted); font-size: 12.5px; }
+.learn-body .callout { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; margin: 4px 0 10px; }
+.learn-body .callout.warn-c { border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.ev { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); margin-top: 4px; }
+.tier { display: grid; grid-template-columns: 40px minmax(0,1fr); gap: 12px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.tier:first-of-type { border-top: 0; }
+.tier .l { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 20px; border: 1.5px solid var(--line); }
+.tier.s .l { background: var(--protein); border-color: var(--protein); color: #fff; }
+.tier.a .l { border-color: var(--protein); color: var(--protein); }
+.tier .f { font-weight: 600; }
+.tier .w { color: var(--muted); font-size: 13.5px; }
+.aa { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 10px; }
+.aa th { text-align: left; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 6px 6px 6px 0; }
+.aa td { padding: 8px 6px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.aa td.n { text-align: right; white-space: nowrap; font-family: var(--font-display); font-weight: 700; }
+.aa .sub { color: var(--muted); font-size: 12.5px; }
+.aa-group { font-weight: 700; margin: 12px 0 2px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.src { font-size: 13px; color: var(--muted); padding-left: 18px; }
+.src li { margin-bottom: 4px; }
+.src a { color: var(--fg); }
 .tag.rec { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); margin-left: 6px; vertical-align: 2px; }
 .macro-targets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .macro-targets .v { font-size: 20px; font-weight: 700; }
@@ -537,7 +581,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 15</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 16</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -567,6 +611,11 @@ select.in { padding-right: 30px;
   <h1 class="page-title">Plan</h1>
   <div id="planBody"></div>
   <div id="backupBody" class="cal-page" style="margin-top:14px"></div>
+</div>
+
+<div class="app cal-page" id="learnPage" hidden>
+  <div class="learn-top"><button class="learn-back" type="button" id="learnBack">‹ Today</button></div>
+  <div id="learnBody" class="cal-page"></div>
 </div>
 
 <nav class="tabbar" aria-label="Main">
@@ -845,7 +894,7 @@ select.in { padding-right: 30px;
     none: { label: "Nothing logged", color: "var(--track)" }
   };
   // Gaining goals flip the colors: under target is the miss, over target is fine.
-  function surplusGoal() { var g = goalOf(state.settings); return g === "muscle" || g === "gain"; }
+  function surplusGoal() { return goalOf(state.settings) === "bulk"; }
   function syncStatusLabels() {
     var up = surplusGoal();
     STATUS.mid.label = up ? "A little under" : "A little over";
@@ -1001,8 +1050,153 @@ select.in { padding-right: 30px;
   $("macros").addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-macro]");
     if (!b) return;
-    toast(b.querySelector(".name").textContent + " details are coming soon");
+    if (LEARN[b.dataset.macro]) { learnTopic = b.dataset.macro; showTab("learn"); return; }
+    toast(b.querySelector(".name").textContent + " details are coming soon. We're still researching it.");
   });
+
+
+  // ---------- Learn pages ----------
+  // Content comes from the "Nutrition Skill Tree" doc, rewritten for anyone. Every number has a source.
+  var learnTopic = "protein";
+  var TIERS = [
+    { l: "S", foods: "Whey protein, milk, eggs, Greek yogurt, cottage cheese, chicken breast, lean turkey, lean beef, tuna", why: "Top quality, high leucine, lots of protein per calorie" },
+    { l: "A", foods: "Salmon, pork, cheese, fattier cuts of beef", why: "Top quality, but more of the calories come from fat" },
+    { l: "B", foods: "Tofu, tempeh, edamame, soy milk, pea and rice protein blends", why: "The best plant proteins. Eat a bit more per meal" },
+    { l: "C", foods: "Beans, lentils, chickpeas, peanut butter", why: "Real protein, but it comes with lots of carbs, fiber or fat" },
+    { l: "D", foods: "Bread, pasta, rice, oats, nuts", why: "Little protein per bite and lower quality. Count it, don't rely on it" }
+  ];
+  // Adult minimums, WHO/FAO/UNU 2007, mg per kg of body weight a day
+  var AMINOS = [
+    { group: "The builders (BCAAs)" },
+    { n: "Leucine", mg: 39, does: "The start button for muscle building", foods: "Whey, milk, beef, chicken, eggs" },
+    { n: "Isoleucine", mg: 20, does: "Helps muscles take in sugar for fuel; helps build hemoglobin", foods: "Chicken, fish, eggs, cheese" },
+    { n: "Valine", mg: 26, does: "Fuel and repair for working muscle", foods: "Beef, cottage cheese, soy, peanuts" },
+    { group: "The structure crew" },
+    { n: "Lysine", mg: 30, does: "Builds collagen for tendons and skin; helps absorb calcium", foods: "Meat, fish, dairy, beans. Low in grains" },
+    { n: "Threonine", mg: 15, does: "Collagen, gut lining, immune system", foods: "Cottage cheese, chicken, lentils" },
+    { n: "Methionine", mg: 15, plus: "+ cysteine", does: "Starts every new protein; helps make creatine", foods: "Eggs, meat, fish. Low in beans" },
+    { group: "Mood and hormones" },
+    { n: "Phenylalanine", mg: 25, plus: "+ tyrosine", does: "Makes dopamine, adrenaline and thyroid hormone", foods: "Meat, eggs, milk, soy" },
+    { n: "Tryptophan", mg: 4, does: "Makes serotonin, then melatonin for sleep", foods: "Turkey, chicken, milk, oats" },
+    { n: "Histidine", mg: 10, does: "Makes carnosine, which buffers the burn in hard sets", foods: "Meat, fish, poultry" }
+  ];
+  function learnSec(title, sub, body, open) {
+    return '<details class="card learn-sec"' + (open ? ' open' : '') + '><summary><span class="t"><b>' + title + '</b><small>' + sub + '</small></span><span class="chev" aria-hidden="true">›</span></summary><div class="learn-body">' + body + '</div></details>';
+  }
+  var LEARN = {
+    protein: function () {
+      var today = totals(entriesFor(selectedDate)).protein, w = currentWeight(), real = realTargets();
+      var kg = w ? w * 0.453592 : null;
+      var hero = '<section class="card learn-hero">' +
+        '<div class="kicker"><span class="dot" style="--c:var(--protein)"></span>Protein</div>' +
+        '<h1>Building blocks for muscle</h1>' +
+        '<p class="lead">Protein is a box of building blocks. One block, <b>leucine</b>, is the switch that starts the build. Hit your daily total, and spread it over 3 to 5 meals.</p>' +
+        '<div class="learn-stats"><div><div class="v num">' + fmtG(today) + '<small>g</small></div><div class="k">' + (selectedDate === dayKey() ? "Eaten today" : "Eaten that day") + '</div></div>' +
+        '<div><div class="v num">' + fmt(TARGETS.protein) + '<small>g</small></div><div class="k">' + (real ? "Your daily target" : "Sample target") + '</div></div></div>' +
+        '</section>';
+
+      var how = learnSec("How protein builds muscle", "Bricks, the 9 must-haves, and the leucine switch",
+        '<ul>' +
+        '<li><b>Bricks:</b> digestion breaks protein into amino acids. There are 20 kinds.</li>' +
+        '<li><b>Must-haves:</b> 9 of them are "essential". Your body can\'t make them, so food has to bring them.</li>' +
+        '<li><b>Building:</b> muscles snap the bricks back together into new muscle. Scientists call this muscle protein synthesis.</li>' +
+        '<li><b>Start button:</b> leucine also tells muscles to start building. About <b>2.5 to 3 g of leucine per meal</b> presses it fully. 25 g of whey carries about 3 g.</li>' +
+        '</ul>' +
+        '<div class="callout"><b>More leucine isn\'t always better.</b> A small whey dose with extra leucine matched a full dose at rest, but only the full dose kept building going after exercise. Leucine starts the build; you still need all 9 bricks to finish it.</div>' +
+        '<p><b>You can\'t keep it on all day.</b> Building rises after a meal, then shuts off after a few hours even if amino acids stay high (the "muscle full" effect). That\'s why 3 to 5 protein meals beat all-day grazing.</p>' +
+        '<p class="cite">Norton & Layman 2006; Churchward-Venne 2012; Trommelen 2019.</p><span class="ev">Evidence: strong</span>', true);
+
+      var tiers = learnSec("Protein tier list", "Which foods give you the most and best protein",
+        TIERS.map(function (t) {
+          return '<div class="tier ' + t.l.toLowerCase() + '"><div class="l" aria-label="' + t.l + ' tier">' + t.l + '</div><div><div class="f">' + t.foods + '</div><div class="w">' + t.why + '</div></div></div>';
+        }).join("") +
+        '<p class="cite" style="margin-top:8px">Ranked by quality score (DIAAS: how much of each essential amino acid you actually absorb), leucine, and protein per calorie. Scores shift a little with the lab method.</p><span class="ev">Evidence: moderate</span>');
+
+      var speed = learnSec("Fast vs slow protein", "Whey, casein, and protein before bed",
+        '<ul>' +
+        '<li><b>Whey is a speedboat.</b> It hits your blood fast and spikes muscle building. Good after training.</li>' +
+        '<li><b>Casein is a cargo ship.</b> It releases slowly over hours.</li>' +
+        '<li><b>Milk has both:</b> about 80% casein and 20% whey.</li>' +
+        '</ul>' +
+        '<p><b>Before bed:</b> sleep is a long gap with no food. 40 g of casein before bed raised overnight muscle building about 22%; 30 g didn\'t. A protein snack didn\'t hurt sleep in athletes. The bonus is small if you already hit your daily protein.</p>' +
+        '<div class="callout"><b>Slow, casein-rich picks:</b> cottage cheese, Greek yogurt, casein powder, a glass of milk.</div>' +
+        '<p class="cite">Trommelen 2019; Reis 2021; Paterson 2025.</p><span class="ev">Evidence: mixed</span>');
+
+      var plant = learnSec("Animal vs plant protein", "Why animal protein is easy mode, and how plants catch up",
+        '<p>Animal and dairy proteins win on all three things that decide quality:</p>' +
+        '<ul>' +
+        '<li><b>Complete bricks:</b> whey is 43% essential amino acids, egg 32%; oat and wheat about 21%.</li>' +
+        '<li><b>Leucine:</b> milk is 9% leucine, egg 7%. Plants range from 5% (hemp) to 13.5% (corn).</li>' +
+        '<li><b>Digestibility:</b> a typical North American diet is 88 to 94% absorbed; diets built on unrefined grains and beans, 54 to 78%.</li>' +
+        '</ul>' +
+        '<p><b>Plants can work.</b> Vegan and meat-eating young men eating plenty of protein (1.6 g per kg) gained the same leg muscle in 12 weeks. The vegans needed more powder to get there.</p>' +
+        '<div class="callout"><b>Mix plants so they fill each other\'s gaps.</b> Grains run low on lysine, beans on methionine. Rice and beans, hummus and pita, peanut butter on whole-wheat bread, lentils with rice. For muscle, pair them in the same meal.</div>' +
+        '<p><b>Tofu is the best plant protein</b>, scoring 97 on the quality scale (chicken 108, egg 113). Beans are mostly a carb food: getting 150 g of protein from black beans takes about 10 cups.</p>' +
+        '<p><b>Soy and hormones:</b> 41 studies found soy doesn\'t change testosterone or estrogen in men at normal intakes.</p>' +
+        '<p class="cite">Gorissen 2018; Gilani 2012; Hevia-Larraín 2021; Lim 2021; Reed 2021.</p><span class="ev">Evidence: strong to moderate</span>');
+
+      var hacks = learnSec("Get more from your protein", "Free upgrades: cooking, timing and what to skip",
+        '<ul>' +
+        '<li><b>Cook your eggs.</b> Cooked egg protein was 91% absorbed, raw only 51% (a small 5-person study). Raw eggs also carry a Salmonella risk.</li>' +
+        '<li><b>Keep the yolks if you like them.</b> Whole eggs built more muscle than whites in one study; a newer one found no difference. A bonus, not a must.</li>' +
+        '<li><b>Big meals aren\'t wasted.</b> About 50 g of protein in one meal was still put to use.</li>' +
+        '<li><b>Carbs don\'t boost building.</b> Adding 50 g of carbs to 25 g of whey changed nothing. Carbs are fuel, not a protein booster.</li>' +
+        '<li><b>Heavy drinking blunts it.</b> About 8 drinks after training cut muscle building 24%, even with protein. 1 to 2 drinks, not right after training, is the safer rule.</li>' +
+        '</ul>' +
+        '<p class="cite">Evenepoel 1998; van Vliet 2017; Haigh 2026; Staples 2011; Parr 2014.</p><span class="ev">Evidence: mixed</span>');
+
+      var need = learnSec("How much protein you need", "Your daily target and per-meal amount",
+        '<ul>' +
+        '<li><b>Daily:</b> this app uses 0.8 g per pound of body weight' + (w ? ' (' + fmt(0.8 * w) + ' g for you)' : '') + '. Research for building and keeping muscle supports 1.6 to 2.2 g per kg, which is 0.7 to 1.0 g per pound.</li>' +
+        '<li><b>Per meal:</b> 25 to 40 g of quality protein, 3 to 5 times a day. That hits the leucine start button each time.</li>' +
+        '<li><b>Around training:</b> a protein meal within 1 to 2 hours before and after lifting.</li>' +
+        '</ul>' +
+        '<div class="callout warn-c"><b>Kidney disease?</b> Ask your doctor how much protein is right for you before raising it.</div>' +
+        '<p class="cite">Iraki 2019; Trommelen 2019.</p><span class="ev">Evidence: moderate</span>');
+
+      var rows = AMINOS.map(function (a) {
+        if (a.group) return '<tr><td colspan="2"><div class="aa-group">' + a.group + '</div></td></tr>';
+        var min = kg ? (Math.round(a.mg * kg / 100) / 10).toFixed(1) + ' g' : a.mg + ' mg/kg';
+        return '<tr><td><b>' + a.n + '</b>' + (a.plus ? ' <span class="sub">' + a.plus + '</span>' : '') + '<div>' + a.does + '</div><div class="sub">' + a.foods + '</div></td><td class="n">' + min + '</td></tr>';
+      }).join("");
+      var aminos = learnSec("The 9 essential amino acids", "What each one does and where to get it",
+        '<table class="aa"><thead><tr><th>Amino acid</th><th style="text-align:right">' + (kg ? "Your minimum" : "Minimum") + '</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<p>' + (kg ? 'Minimums are for health at ' + fmt(w) + ' lb, not for max muscle.' : 'Enter your weight in Plan to see your own numbers.') + ' Complete proteins like meat, eggs and dairy clear them easily, so only leucine is worth a per-meal check.</p>' +
+        '<p><b>Skip BCAA supplements.</b> They bring only 3 of the 9, and your food already has plenty. Muscles need all 9 to finish the build.</p>' +
+        '<p><b>The turkey myth:</b> turkey doesn\'t make you sleepy from tryptophan; the big meal does.</p>' +
+        '<p class="cite">WHO/FAO/UNU 2007 adult requirements.</p><span class="ev">Evidence: strong</span>');
+
+      var src = learnSec("Sources", "Where every number on this page comes from",
+        '<ol class="src">' +
+        '<li>Norton & Layman 2006: leucine and muscle building after exercise</li>' +
+        '<li><a href="https://experts.mcmaster.ca/scholarly-works/61794" target="_blank" rel="noopener">Churchward-Venne 2012: extra leucine vs a full whey dose</a></li>' +
+        '<li>Trommelen 2019: muscle building after meals and lifting (review)</li>' +
+        '<li>Gorissen 2018: amino acids in plant vs animal proteins</li>' +
+        '<li>Gilani 2012: anti-nutrients and protein digestibility</li>' +
+        '<li>DIAAS protein quality scores</li>' +
+        '<li>Hevia-Larraín 2021: vegan vs meat-eating lifters</li>' +
+        '<li>Lim 2021: animal vs plant protein meta-analysis</li>' +
+        '<li><a href="https://pubmed.ncbi.nlm.nih.gov/33383165/" target="_blank" rel="noopener">Reed 2021: soy and male hormones</a></li>' +
+        '<li><a href="https://pubmed.ncbi.nlm.nih.gov/32811763/" target="_blank" rel="noopener">Reis 2021: protein before sleep</a></li>' +
+        '<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12427086/" target="_blank" rel="noopener">Paterson 2025: protein before bed and sleep quality</a></li>' +
+        '<li>Evenepoel 1998: cooked vs raw egg protein</li>' +
+        '<li>van Vliet 2017: whole eggs vs egg whites; Haigh 2026: whole foods vs egg whites</li>' +
+        '<li>Staples 2011: carbs added to protein</li>' +
+        '<li><a href="https://experts.mcmaster.ca/scholarly-works/61766" target="_blank" rel="noopener">Parr 2014: alcohol and muscle building</a></li>' +
+        '<li>Iraki 2019: bodybuilding nutrition recommendations</li>' +
+        '<li><a href="https://en.wikipedia.org/wiki/Essential_amino_acid" target="_blank" rel="noopener">WHO/FAO/UNU 2007: essential amino acid requirements</a></li>' +
+        '</ol>' +
+        '<p class="cite">Some sources have a stake: the bedtime-protein sleep study was funded by dairy and protein companies, and a soy-study co-author writes for a soy industry group. Their numbers match the original studies.</p>');
+
+      return hero + how + tiers + need + speed + plant + hacks + aminos + src;
+    }
+  };
+  function renderLearn() {
+    var f = LEARN[learnTopic] || LEARN.protein;
+    $("learnBody").innerHTML = f();
+  }
+  $("learnBack").addEventListener("click", function () { showTab("day"); });
+  window.__nutritionTest.renderLearn = renderLearn;
 
   // ---------- Add-food sheet ----------
   var sheetKind = "meal";    // "meal" | "snack"
@@ -1795,12 +1989,14 @@ select.in { padding-right: 30px;
     $("calPage").hidden = t !== "cal";
     $("weightPage").hidden = t !== "weight";
     $("planPage").hidden = t !== "plan";
+    $("learnPage").hidden = t !== "learn";
     Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
-      if (b.dataset.tab === t) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+      if (b.dataset.tab === t || (t === "learn" && b.dataset.tab === "day")) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     if (t === "cal") { calDate = selectedDate; renderCalendar(); }
     else if (t === "weight") renderWeight();
     else if (t === "plan") { renderPlan(); renderBackup(); }
+    else if (t === "learn") renderLearn();
     else render();
     window.scrollTo(0, 0);
   }
@@ -1985,7 +2181,7 @@ select.in { padding-right: 30px;
       var last = tr[tr.length - 1], w7 = changeOver(tr, 7), w30 = changeOver(tr, 30), goal = state.settings.goalLb;
       function chip(c, label) {
         if (!c) return "";
-        var g = goalOf(state.settings), toward = g === "lose" ? c.diff < -0.05 : (g === "muscle" || g === "gain") ? c.diff > 0.05 : false;
+        var g = goalOf(state.settings), toward = g === "lose" ? c.diff < -0.05 : g === "bulk" ? c.diff > 0.05 : false;
         return '<span class="stat-chip' + (toward ? ' toward' : '') + '">' + signed(c.diff) + ' lb <span>' + (c.full ? label : 'since ' + shortDate(c.since)) + '</span></span>';
       }
       html += '<section class="card w-hero">' +
@@ -2053,23 +2249,28 @@ select.in { padding-right: 30px;
   var GOALS = [
     { id: "lose",     label: "Lose fat",     desc: "Calorie deficit, keep muscle" },
     { id: "maintain", label: "Maintain",     desc: "Stay at the same weight" },
-    { id: "muscle",   label: "Build muscle", desc: "Small surplus, slow lean gain" },
-    { id: "gain",     label: "Gain weight",  desc: "Bigger surplus, for people who need to put on weight" }
+    { id: "bulk",     label: "Bulk",         desc: "Eat in a surplus to build muscle" }
   ];
   // About 3,500 kcal per pound, so 500 kcal a day is about 1 lb a week.
-  // Build muscle: 10-15% over maintenance, inside the 10-20% range for lean gains (Iraki 2019).
+  // Bulk: 10-20% over maintenance, the range for gaining muscle (Iraki 2019). Faster = more of the gain is fat (Helms 2023).
   var PACES = [
     { id: "0.5",  goal: "lose",     delta: -250,  label: "Lose 0.5 lb a week", sub: "Slow and easy to stick with" },
     { id: "1",    goal: "lose",     delta: -500,  label: "Lose 1 lb a week",   sub: "A solid pace for losing fat while keeping muscle", rec: true },
     { id: "2",    goal: "lose",     delta: -1000, label: "Lose 2 lb a week",   aggressive: true },
     { id: "0",    goal: "maintain", delta: 0,     label: "Maintain weight",    sub: "Eat about what you burn", rec: true },
-    { id: "m10",  goal: "muscle",   pct: 0.10,    label: "Lean gain (+10%)",   sub: "Slow, least fat gained", rec: true },
-    { id: "m15",  goal: "muscle",   pct: 0.15,    label: "Standard gain (+15%)", sub: "Faster, a bit more fat" },
-    { id: "g0.5", goal: "gain",     delta: 250,   label: "Gain 0.5 lb a week", sub: "Steady and easy to stick with", rec: true },
-    { id: "g1",   goal: "gain",     delta: 500,   label: "Gain 1 lb a week",   sub: "Faster, more of the gain will be fat" }
+    { id: "m10",  goal: "bulk",     pct: 0.10,    label: "Lean bulk (+10%)",     sub: "Slow, least fat gained", rec: true },
+    { id: "m15",  goal: "bulk",     pct: 0.15,    label: "Standard bulk (+15%)", sub: "Faster, a bit more fat" },
+    { id: "m20",  goal: "bulk",     pct: 0.20,    label: "Fast bulk (+20%)",     sub: "Fastest weight gain, more of it is fat", fatty: true }
   ];
+  // Version 15 had separate "Build muscle" and "Gain weight" goals; both are Bulk now.
+  function tidyGoal(s) {
+    if (s.goal === "muscle" || s.goal === "gain") s.goal = "bulk";
+    if (s.pace === "g0.5") s.pace = "m10";
+    if (s.pace === "g1") s.pace = "m15";
+  }
   // Older versions saved only a pace: "0" meant maintain, any other pace meant losing.
   function goalOf(s) {
+    tidyGoal(s);
     if (s.goal) return s.goal;
     if (s.pace == null) return null;
     return s.pace === "0" ? "maintain" : "lose";
@@ -2132,8 +2333,7 @@ select.in { padding-right: 30px;
     var goalNote = {
       lose: "The target below maintenance is what creates the fat loss.",
       maintain: "This target keeps your weight about the same.",
-      muscle: "The small surplus pays for building muscle. It goes to muscle only with strength training; without it, a surplus mostly adds fat.",
-      gain: "The surplus above maintenance adds weight. Strength training helps more of it be muscle."
+      bulk: "The surplus pays for building muscle. It goes to muscle only with strength training; without it, a surplus mostly adds fat."
     };
     var top = '<section class="card plan-card">' +
       '<div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Daily calorie target</div>' +
@@ -2158,7 +2358,7 @@ select.in { padding-right: 30px;
         if (low) sub += '<small class="warn" style="display:block">Below ' + fmt(floorKcal()) + ' kcal. Too low.</small>';
         return '<button class="pace" type="button" role="radio" data-pace="' + p.id + '" aria-checked="' + (s.pace === p.id) + '">' +
           '<span class="radio" aria-hidden="true"></span>' +
-          '<span class="t"><b>' + p.label + (p.aggressive ? '<span class="tag aggr">Aggressive</span>' : '') + '</b>' + sub + '</span>' +
+          '<span class="t"><b>' + p.label + (p.aggressive ? '<span class="tag aggr">Aggressive</span>' : '') + (p.fatty ? '<span class="tag aggr">More fat</span>' : '') + '</b>' + sub + '</span>' +
           '<span class="k num">' + fmt(x.kcal) + '<small>kcal a day</small></span></button>';
       }).join("") + '</section>';
     }
@@ -2193,7 +2393,7 @@ select.in { padding-right: 30px;
         '<div><label class="lab" for="pGoal">Goal weight (lb)</label><input class="in num-in" id="pGoal" type="text" inputmode="decimal" placeholder="Optional" value="' + esc(s.goalLb == null ? "" : s.goalLb) + '"></div>' +
       '</div></section>';
 
-    var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below or above it. Build muscle eats 10 or 15% above maintenance, inside the 10 to 20% range research supports for gaining muscle with less fat. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with your doctor before starting, especially with any health condition.</p></section>';
+    var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below or above it. Bulk eats 10 to 20% above maintenance, the range research supports for gaining muscle; the faster paces add more fat. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with your doctor before starting, especially with any health condition.</p></section>';
 
     var html = top + goals + paces + macros + stats + how;
     $("planBody").innerHTML = '<div class="cal-page">' + html + '</div>';
