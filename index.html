@@ -14,6 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D1015" media="(prefers-color-scheme: dark)">
+<script>/* Appearance chosen in Settings (this device only), applied before the page draws */
+try { var t0 = localStorage.getItem("dads-nutrition-theme"); if (t0 === "light" || t0 === "dark") document.documentElement.setAttribute("data-theme", t0); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://api.nal.usda.gov">
@@ -514,6 +516,30 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .plan-box .mini { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 14px; }
 .plan-box .mini span { display: inline-flex; align-items: center; gap: 5px; }
 .plan-box .mini .num { font-weight: 700; }
+.plan-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plan-head .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* Creatine */
+.cr-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.cr-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cr-head b { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.cr-head span { color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.cr-head span.ok { color: var(--good); }
+.cr-sub { margin: -6px 0 0; color: var(--muted); font-size: 13.5px; }
+.doses { display: flex; gap: 8px; }
+.dose { flex: 1; min-height: 46px; border-radius: 12px; background: var(--surface-2); font-weight: 700; font-size: 15px; border: 1.5px dashed var(--line); }
+.dose[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border: 1.5px solid var(--ink); }
+.switch-row { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 2px 0; }
+.switch-row .t { flex: 1; min-width: 0; }
+.switch-row b { display: block; font-weight: 600; font-size: 16px; }
+.switch-row small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; line-height: 1.35; }
+.switch { flex: none; width: 50px; height: 30px; border-radius: 999px; background: var(--track); position: relative; transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.switch-row[aria-checked="true"] .switch { background: var(--good); }
+.switch-row[aria-checked="true"] .switch::after { transform: translateX(20px); }
+.cr-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 10px; }
+.cr-table th { text-align: left; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 6px 8px 6px 0; }
+.cr-table td { padding: 8px 8px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.cr-table td.n { font-family: var(--font-display); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .pace .radio::after, .pace, .pace .radio { transition: none; } }
 .pace .t b { display: block; font-weight: 600; }
 .pace .t small { color: var(--muted); font-size: 12.5px; }
@@ -639,12 +665,13 @@ select.in { padding-right: 30px;
   </section>
 
   <section class="macros" id="macros" aria-label="Macros"></section>
+  <section class="card cr-card" id="crCard" aria-label="Creatine" hidden></section>
 
   <div class="section-h"><h2>Logged food</h2><span id="itemCount"></span></div>
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 28</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 29</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -672,7 +699,8 @@ select.in { padding-right: 30px;
 
 <div class="app cal-page" id="planPage" hidden>
   <div class="learn-top" id="planTop" hidden><button class="learn-back" type="button" id="planBack">‹ Plan</button></div>
-  <h1 class="page-title" id="planTitle">Plan</h1>
+  <div class="plan-head"><h1 class="page-title" id="planTitle">Plan</h1>
+    <button class="icon-btn" type="button" id="settingsBtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></button></div>
   <div id="planBody"></div>
   <div id="backupBody" class="cal-page" hidden></div>
   <div id="importBody" class="cal-page" hidden></div>
@@ -1041,6 +1069,8 @@ select.in { padding-right: 30px;
         '<div class="left' + (rem < 0 ? ' over' : '') + '">' + (rem < 0 ? fmt(-rem) + ' g over' : fmt(rem) + ' g left') + '</div>' +
         '</button>';
     }).join("");
+
+    renderCreatine();
 
     var units = unitsOf(list);
     var meals = units.filter(function (u) { return u.items[0].kind !== "snack"; }).length;
@@ -2297,14 +2327,71 @@ select.in { padding-right: 30px;
   $("completeBox").addEventListener("click", function (ev) {
     var b = ev.target.closest("button"); if (!b) return;
     if (b.id === "completeBtn") {
-      state.days[selectedDate] = { complete: true, target: TARGETS.kcal };
+      state.days[selectedDate] = Object.assign({}, state.days[selectedDate], { complete: true, target: TARGETS.kcal });
       save(); render();
       toast(COMPLETE_MSG[dayInfo(selectedDate).status] || "Day complete");
     } else if (b.id === "reopenBtn") {
-      delete state.days[selectedDate];
+      var keepDay = Object.assign({}, state.days[selectedDate]);
+      delete keepDay.complete; delete keepDay.target;
+      if (Object.keys(keepDay).length) state.days[selectedDate] = keepDay; else delete state.days[selectedDate];
       save(); render();
     }
   });
+
+  // ---------- Creatine tracker ----------
+  // Doses come from the Skill Tree doc, Level 11 (Nov 11, 2026):
+  // Muscle: 5 g a day (ISSN). Muscle + brain: 10 g a day as 2 doses of 5 g.
+  // Optional loading: muscle 0.3 g per kg a day for 5 days (capped at 25 g); brain 20 g a day for 7 days. Both in 4 doses.
+  // Settings (synced with the backup): settings.creatine = { on, goal: "muscle" | "brain", since, load, loadStart }
+  // Taken doses per day: state.days[date].cr = number of doses taken.
+  function crSettings() { var c = state.settings.creatine; return c && typeof c === "object" ? c : { on: false }; }
+  function daysBetween(a, b) { return Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5); }
+  function addDays(k, n) { var d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function crLoadDays(c) { return c.goal === "brain" ? 7 : 5; }
+  function crKg() { var w = currentWeight(); return w ? w * 0.453592 : null; }
+  function crLoadTotal(c) {
+    if (c.goal === "brain") return 20;
+    var kg = crKg();
+    return kg ? Math.min(25, Math.round(0.3 * kg)) : 20;
+  }
+  function crDaily(c) { return c.goal === "brain" ? { total: 10, doses: 2, per: 5 } : { total: 5, doses: 1, per: 5 }; }
+  function crPlan(k) {
+    var c = crSettings();
+    if (!c.on || (c.since && k < c.since)) return null;
+    if (c.load && c.loadStart && k >= c.loadStart) {
+      var i = daysBetween(c.loadStart, k), n = crLoadDays(c);
+      if (i < n) { var tot = crLoadTotal(c), per = Math.round(tot / 4 * 2) / 2; return { loading: true, day: i + 1, of: n, total: tot, doses: 4, per: per, approx: per * 4 !== tot }; }
+    }
+    return crDaily(c);
+  }
+  function gTxt(n) { return (Math.round(n * 10) / 10).toString(); }
+  function renderCreatine() {
+    var box = $("crCard"), p = crPlan(selectedDate);
+    if (!p) { box.hidden = true; box.innerHTML = ""; return; }
+    var d = state.days[selectedDate] || {}, taken = Math.min(p.doses, d.cr || 0), done = taken >= p.doses;
+    var goal = crSettings().goal === "brain" ? "Muscle + brain" : "Muscle";
+    var status = done ? '<span class="ok">✓ Taken</span>' : p.doses > 1 ? '<span>' + taken + ' of ' + p.doses + ' doses</span>' : '<span>Not taken yet</span>';
+    var sub = p.loading ? 'Loading day ' + p.day + ' of ' + p.of + ' · ' + gTxt(p.total) + ' g today in ' + p.doses + ' doses' : gTxt(p.total) + ' g today · ' + goal;
+    var pills = "";
+    for (var i = 0; i < p.doses; i++) {
+      var on = i < taken;
+      pills += '<button class="dose" type="button" data-dose="' + i + '" aria-pressed="' + on + '" aria-label="Dose ' + (i + 1) + ' of ' + p.doses + ', ' + gTxt(p.per) + ' grams' + (on ? ', taken. Tap to undo' : '') + '">' +
+        (on ? '✓ ' : (p.doses === 1 ? 'Take ' : '')) + (p.approx ? '~' : '') + gTxt(p.per) + ' g</button>';
+    }
+    box.innerHTML = '<div class="cr-head"><b>Creatine</b>' + status + '</div><p class="cr-sub">' + sub + '</p><div class="doses">' + pills + '</div>';
+    box.hidden = false;
+  }
+  $("crCard").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-dose]"); if (!b) return;
+    var p = crPlan(selectedDate); if (!p) return;
+    var i = +b.dataset.dose, d = Object.assign({}, state.days[selectedDate]), taken = Math.min(p.doses, d.cr || 0);
+    var n = i < taken ? i : i + 1;          // tap a taken dose to undo it (and the ones after it)
+    if (n) d.cr = n; else delete d.cr;
+    if (Object.keys(d).length) state.days[selectedDate] = d; else delete state.days[selectedDate];
+    save(); render();
+    if (n >= p.doses && taken < p.doses) toast("Creatine done for " + (selectedDate === dayKey() ? "today" : "that day") + ". " + gTxt(p.total) + " g");
+  });
+  window.__nutritionTest.crPlan = function (k) { return crPlan(k); };
 
   // ---------- Day navigation ----------
   function goDay(k) {
@@ -2663,6 +2750,140 @@ select.in { padding-right: 30px;
   window.__nutritionTest.goalOf = goalOf;
   window.__nutritionTest.calc = calc; window.__nutritionTest.macroTargets = macroTargets; window.__nutritionTest.ageOn = ageOn;
 
+  // ---------- Plan > Creatine ----------
+  function crSummary() {
+    var c = crSettings();
+    if (!c.on) return "Off. Optional tracker for muscle and brain.";
+    var p = crPlan(dayKey()), goal = c.goal === "brain" ? "Muscle + brain" : "Muscle";
+    if (p && p.loading) return "On · " + goal + " · loading day " + p.day + " of " + p.of + " (" + gTxt(p.total) + " g today)";
+    var dd = crDaily(c);
+    return "On · " + goal + " · " + dd.total + " g a day";
+  }
+  function creatineView() {
+    var c = crSettings(), kg = crKg(), w = currentWeight(), p = crPlan(dayKey());
+    var muscleLoad = crLoadTotal({ goal: "muscle" });
+    var card = '<section class="card plan-card">' +
+      '<button class="switch-row" type="button" role="switch" aria-checked="' + !!c.on + '" data-cr="on"><span class="t"><b>Track creatine</b><small>Shows a creatine reminder on your Today screen to tap when you take it.</small></span><span class="switch" aria-hidden="true"></span></button>';
+    if (c.on) {
+      var goal = c.goal === "brain" ? "brain" : "muscle";
+      card += '<span class="lab" style="margin:4px 0 -4px">What it\'s for</span><div role="radiogroup" aria-label="Creatine goal">' +
+        '<button class="pace" type="button" role="radio" data-crgoal="muscle" aria-checked="' + (goal === "muscle") + '"><span class="radio" aria-hidden="true"></span><span class="t"><b>Muscle</b><small>One 5 g dose a day. The most studied dose for strength and muscle.</small></span><span class="k num">5 g<small>a day</small></span></button>' +
+        '<button class="pace" type="button" role="radio" data-crgoal="brain" aria-checked="' + (goal === "brain") + '"><span class="radio" aria-hidden="true"></span><span class="t"><b>Muscle + brain</b><small>Two 5 g doses a day. The brain takes in less than muscle, so it needs more. Brain studies are smaller.</small></span><span class="k num">10 g<small>a day</small></span></button>' +
+        '</div>' +
+        '<button class="switch-row" type="button" role="switch" aria-checked="' + !!c.load + '" data-cr="load"><span class="t"><b>Start with a loading week</b><small>' +
+          (goal === "brain" ? '20 g a day for 7 days, as 4 doses of 5 g, then 10 g a day.'
+            : gTxt(muscleLoad) + ' g a day for 5 days, as 4 doses' + (kg ? ' (0.3 g × your ' + fmt(kg) + ' kg)' : '. Add your weight in Your stats for an exact amount') + ', then 5 g a day.') +
+          ' Optional: it fills you up in about a week instead of 3 to 4.</small></span><span class="switch" aria-hidden="true"></span></button>';
+      if (p) {
+        card += '<div class="callout" style="background:var(--surface-2);border-radius:12px;padding:10px 12px;font-size:14px">' +
+          (p.loading ? '<b>Loading day ' + p.day + ' of ' + p.of + '.</b> ' + gTxt(p.total) + ' g today as ' + p.doses + ' doses of ' + (p.approx ? 'about ' : '') + gTxt(p.per) + ' g. Back to ' + crDaily(c).total + ' g a day on ' + shortDate(addDays(c.loadStart, p.of)) + '.'
+            : '<b>Today:</b> ' + gTxt(p.total) + ' g' + (p.doses > 1 ? ' as ' + p.doses + ' doses of ' + gTxt(p.per) + ' g' : '') + '.') + '</div>';
+      }
+    }
+    card += '<p class="note">Check with your doctor first if you have kidney disease or bipolar disorder, are pregnant or breastfeeding, or take regular medication.</p></section>';
+
+    var kgTxt = kg ? fmt(w) + ' lb (' + fmt(kg) + ' kg)' : null;
+    var ev = function (t) { return '<span class="ev">Evidence: ' + t + '</span>'; };
+    var how = learnSec("How creatine works", "A quick-refill battery for your cells",
+      '<ul><li><b>The refill:</b> muscles run on ATP and burn through it fast. Stored creatine refills it in one quick step. That powers the first 5 to 10 seconds of an all-out effort, like a heavy set.</li>' +
+      '<li><b>Why that builds muscle:</b> fuller stores give you an extra rep or two per set. More total work over weeks means more growth. It only pays off if you train.</li>' +
+      '<li><b>Where it comes from:</b> your body makes some, and meat and fish add 1 to 2 g a day. On food alone your muscles are about 60 to 80% full. A supplement tops them off.</li>' +
+      '<li><b>Vegetarians and vegans</b> get almost none from food and often gain more from it.</li></ul>' + ev("strong"), true);
+    var muscle = learnSec("What it does for muscle", "More strength from the same training",
+      '<ul><li><b>Strength:</b> in 23 trials of adults under 50 who lifted, creatine added about 4.4 kg (10 lb) to upper-body lifts and 11.4 kg (25 lb) to lower-body lifts, compared with lifting alone (Wang 2024).</li>' +
+      '<li><b>Muscle size:</b> a small extra gain when measured directly (Burke 2023, 10 trials).</li>' +
+      '<li><b>Scale weight:</b> often up 1 to 4 lb in the first weeks. Part of that is water pulled into the muscle, not fat.</li>' +
+      '<li><b>Older adults who lift:</b> modest extra gains in leg strength and lean mass.</li>' +
+      '<li><b>Without lifting:</b> a 2026 study (10 g a day) reported gains without exercise, but it was small and had problems. Other studies found no benefit without training. Not proven.</li></ul>' + ev("strong for muscle and strength with training"));
+    var brain = learnSec("What it does for your brain", "Memory, sleep loss and more",
+      '<ul><li><b>The catch:</b> your brain makes its own creatine and takes in extra slowly, and muscles grab it first. So the brain needs more: brain levels rose with 20 g a day for a week, or 4 to 5 g a day over several months.</li>' +
+      '<li><b>Memory:</b> a 2024 review of 16 trials (492 people) found better memory, plus faster attention and processing speed. It found no change in overall thinking or planning (Xu 2024).</li>' +
+      '<li><b>Sleep loss:</b> one big dose (0.35 g per kg) helped memory and processing speed in 15 people kept awake about 21 hours. The researchers say not to take that dose at home yet.</li>' +
+      '<li><b>When it shines:</b> most under stress, like sleep loss, older age or illness. Well-rested young people see small effects.</li>' +
+      '<li><b>Early research:</b> Alzheimer\'s (20 g a day, a tiny study with no placebo) and depression (mixed: 2 of 5 small trials helped, both in women). Not a treatment.</li></ul>' + ev("moderate for memory, thin for the rest"));
+    var sex = learnSec("Women and men", "Same dose, a few differences",
+      '<ul><li><b>Same dose</b> for women and men.</li>' +
+      '<li><b>Strength:</b> most trials are in men. Women\'s gains looked smaller, but there were only 2 women\'s trials, so the data is thin.</li>' +
+      '<li><b>Brain:</b> the memory benefit was bigger in women.</li>' +
+      '<li><b>Water weight:</b> studies in women show little or none.</li>' +
+      '<li><b>After menopause:</b> with lifting, it helps muscle and strength. Bone results are mixed.</li>' +
+      '<li><b>Pregnancy and breastfeeding:</b> no human studies, so skip it unless a doctor says otherwise.</li></ul>');
+    var doseRows = [
+      ["Muscle", "5 g a day", "The most studied dose. Fills muscles in 3 to 4 weeks"],
+      ["Muscle + brain", "10 g a day (2 × 5 g)", "The brain needs more than muscle does"],
+      ["Loading, muscle", (kg ? gTxt(muscleLoad) + " g a day" : "0.3 g per kg a day") + " for 5 days", "0.3 g per kg of body weight, in 4 doses"],
+      ["Loading, brain", "20 g a day for 7 days", "The amount that raised brain creatine in studies"]
+    ];
+    var much = learnSec("How much to take", kgTxt ? "Worked out for your " + kgTxt : "Add your weight to see your exact loading dose",
+      '<table class="cr-table"><tr><th>Goal</th><th>Dose</th><th>Why</th></tr>' + doseRows.map(function (r) { return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td><td>' + r[2] + '</td></tr>'; }).join("") + '</table>' +
+      '<ul><li><b>Does weight matter?</b> For loading, yes: 0.3 g per kg' + (kg ? ' × ' + fmt(kg) + ' kg = ' + gTxt(Math.round(0.3 * kg)) + ' g' + (0.3 * kg > 25 ? ', capped at 25 g' : '') : '') + '. For the daily dose, barely: once muscles are full, 3 to 5 g keeps them full for nearly everyone. Very large athletes are sometimes advised up to 10 g.</li>' +
+      '<li><b>Timing:</b> any time works. Taking it every day matters far more than when. With a meal is easy.</li>' +
+      '<li><b>Missed a day?</b> No problem. Stores drain slowly, over about a month.</li></ul>');
+    var load = learnSec("Loading: do you need it?", "Faster, not better",
+      '<ul><li><b>Optional.</b> Loading and the slow way end in the same place. 3 g a day for 28 days filled muscles as well as a loading week.</li>' +
+      '<li><b>What it buys:</b> full muscles in about a week instead of a month.</li>' +
+      '<li><b>What it costs:</b> some bloating, 2 to 4 lb of water weight, and maybe an upset stomach. That\'s why it\'s split into 4 doses. Take them with meals.</li></ul>');
+    var safe = learnSec("Safety", "Kidneys, hair, stomach",
+      '<ul><li><b>Kidneys:</b> no harm in healthy people at up to 20 g a day for up to 5 years. Blood tests will show higher creatinine. That\'s a breakdown product, not damage, so tell your doctor you take it.</li>' +
+      '<li><b>Hair loss:</b> a myth from one small 2009 study that never measured hair. A 2025 trial found no change in hair or DHT.</li>' +
+      '<li><b>Stomach:</b> single doses over 10 g can cause cramps or diarrhea. Split bigger amounts.</li>' +
+      '<li><b>Ask your doctor first</b> if you have kidney disease or bipolar disorder (mania was reported), are pregnant, or take regular medication.</li></ul>' + ev("strong for healthy adults"));
+    var buy = learnSec("Buying it", "Plain monohydrate powder",
+      '<ul><li><b>Form:</b> creatine monohydrate. Other forms (HCl, buffered) aren\'t proven better.</li>' +
+      '<li><b>Quality:</b> look for NSF Certified for Sport, Informed Sport, or the Creapure ingredient.</li>' +
+      '<li><b>Skip gummies:</b> in a 2024 test of 12 gummy brands, 5 had little or no creatine.</li></ul>');
+    var src = learnSec("Sources", "Where these numbers come from",
+      '<ul class="src">' +
+      '<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11547435" target="_blank" rel="noopener">Wang 2024: creatine and strength, 23 trials</a></li>' +
+      '<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10180745" target="_blank" rel="noopener">Burke 2023: creatine and muscle growth, 10 trials</a></li>' +
+      '<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2048496" target="_blank" rel="noopener">ISSN position stand: loading and daily doses</a></li>' +
+      '<li><a href="https://www.frontiersin.org/articles/10.3389/fnut.2024.1424972" target="_blank" rel="noopener">Xu 2024: creatine and thinking, 16 trials</a></li>' +
+      '<li><a href="https://neurosciencenews.com/creatine-cognition-sleep-deprivation-25982/" target="_blank" rel="noopener">Gordji-Nejad 2024: creatine during sleep loss</a></li>' +
+      '<li><a href="https://www.nutraingredients.com/Article/2024/06/18/does-one-dose-of-creatine-supplementation-fit-all/" target="_blank" rel="noopener">Candow 2024: doses for muscle, brain and bone</a></li>' +
+      '<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7998865" target="_blank" rel="noopener">Smith-Ryan 2021: creatine in women\'s health</a></li>' +
+      '<li><a href="https://www.news-medical.net/news/20251203/Settling-the-creatine-safety-debate.aspx" target="_blank" rel="noopener">Longobardi 2025: safety review</a></li>' +
+      '<li><a href="https://supplysidesj.com/supplement-regulations/now-tests-creatine-gummies-finding-almost-half-to-be-severely-understrength-" target="_blank" rel="noopener">NOW 2024: creatine gummy tests</a></li>' +
+      '</ul><p class="cite">Full details are in the Nutrition Skill Tree doc, Level 11.</p>');
+    return card + '<div class="section-h"><h2>Learn about creatine</h2></div>' + how + muscle + brain + sex + much + load + safe + buy + src;
+  }
+
+  // ---------- Plan > Settings ----------
+  var THEME_KEY = "dads-nutrition-theme";
+  function themePref() { try { var t = localStorage.getItem(THEME_KEY); return t === "light" || t === "dark" ? t : "auto"; } catch (e) { return "auto"; } }
+  function applyTheme(t) {
+    var root = document.documentElement;
+    if (t === "light" || t === "dark") root.setAttribute("data-theme", t); else root.removeAttribute("data-theme");
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    Array.prototype.forEach.call(metas, function (m) {
+      var dark = /dark/.test(m.getAttribute("media") || "");
+      m.setAttribute("content", t === "light" ? "#F3F5F8" : t === "dark" ? "#0D1015" : (dark ? "#0D1015" : "#F3F5F8"));
+    });
+  }
+  function setTheme(t) { try { if (t === "auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, t); } catch (e) {} applyTheme(t); }
+  applyTheme(themePref());
+  function settingsView() {
+    var t = themePref(), ver = ($("appVersion") && $("appVersion").textContent) || "";
+    var opt = function (id, label) { return '<button type="button" data-theme-opt="' + id + '" aria-pressed="' + (t === id) + '">' + label + '</button>'; };
+    function box(id, title, sub) { return '<button class="card plan-box" type="button" data-pview="' + id + '"><span class="t"><b>' + title + '</b><small>' + sub + '</small></span><span class="chev" aria-hidden="true">›</span></button>'; }
+    return '<section class="card plan-card"><span class="lab" style="margin:0">Appearance</span>' +
+        '<div class="seg seg3" role="group" aria-label="Appearance">' + opt("auto", "Auto") + opt("light", "Light") + opt("dark", "Dark") + '</div>' +
+        '<p class="note">Auto matches your phone\'s light or dark mode. Saved on this phone only.</p></section>' +
+      '<section class="card plan-card"><div class="backup-row"><span class="t" style="flex:1;min-width:0"><b>' + esc(ver) + '</b><small>The app updates itself when you open it with internet. Tap to get the newest version now.</small></span>' +
+        '<button class="add-btn" type="button" id="updBtn">Update</button></div></section>' +
+      box("creatine", "Creatine tracker", esc(crSummary())) +
+      box("backup", "Backup & import", esc(backupSummary()));
+  }
+  function checkUpdate() {
+    toast("Getting the newest version…");
+    var go = function () { setTimeout(function () { location.reload(); }, 500); };
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+        navigator.serviceWorker.getRegistration().then(function (r) { return r && r.update(); }).catch(function () {}).then(go);
+      } else go();
+    } catch (e) { go(); }
+  }
+  $("settingsBtn").addEventListener("click", function () { openPlanView("settings"); });
+
   function renderPlan() {
     planDirty = false;
     var s = state.settings, w = currentWeight(), c = calc(s, w), hasWeigh = state.weights.length > 0;
@@ -2742,11 +2963,14 @@ select.in { padding-right: 30px;
     else if (planView === "macros") html = (macros || '<section class="card plan-card"><p class="note">Add your stats and pick a goal to get your macro targets. These are samples for now.</p></section>') + how;
     else if (planView === "stats") html = top + stats + how;
     else if (planView === "backup") html = "";
+    else if (planView === "creatine") html = creatineView();
+    else if (planView === "settings") html = settingsView();
     else html = top + planBoxes(s, w, c, goal, hit, missing);
     $("planBody").innerHTML = html ? '<div class="cal-page">' + html + '</div>' : '';
-    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import" };
+    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import", creatine: "Creatine", settings: "Settings" };
     $("planTitle").textContent = titles[planView];
     $("planTop").hidden = planView === "home";
+    $("settingsBtn").hidden = planView !== "home";
     $("backupBody").hidden = planView !== "backup";
     $("importBody").hidden = planView !== "backup";
     $("gsBody").hidden = planView !== "backup";
@@ -2768,6 +2992,7 @@ select.in { padding-right: 30px;
     return box("goal", "Your goal", '<small>' + goalSub + '</small>') +
       box("macros", "Macro targets", '<small>' + (realTargets() ? "In use" : "Samples for now") + '</small>' + mini) +
       box("stats", "Your stats", statsSub) +
+      box("creatine", "Creatine", '<small>' + esc(crSummary()) + '</small>') +
       box("backup", "Backup", '<small id="boxBackupSub">' + esc(backupSummary()) + '</small>');
   }
   function backupSummary() {
@@ -2793,6 +3018,22 @@ select.in { padding-right: 30px;
   $("planBody").addEventListener("click", function (ev) {
     var b = ev.target.closest("button"); if (!b) return;
     if (b.dataset.pview) { openPlanView(b.dataset.pview); return; }
+    if (b.dataset.themeOpt) { setTheme(b.dataset.themeOpt); renderPlan(); return; }
+    if (b.id === "updBtn") { checkUpdate(); return; }
+    if (b.dataset.cr || b.dataset.crgoal) {
+      var cr = Object.assign({ on: false, goal: "muscle" }, crSettings()), today = dayKey();
+      if (b.dataset.cr === "on") {
+        cr.on = !cr.on;
+        if (cr.on && !cr.since) cr.since = today;
+        toast(cr.on ? "Creatine tracker on. It's on your Today screen." : "Creatine tracker off");
+      } else if (b.dataset.cr === "load") {
+        cr.load = !cr.load; cr.loadStart = cr.load ? today : null;
+      } else if (b.dataset.crgoal) {
+        if (cr.goal === b.dataset.crgoal) return;
+        checkNow(b); cr.goal = b.dataset.crgoal; planAnim = true;
+      }
+      state.settings.creatine = cr; planChanged(); render(); return;
+    }
     if (b.dataset.goal || b.dataset.pace) { checkNow(b); planAnim = true; }
     if (b.dataset.goal) {
       var s = state.settings, g = b.dataset.goal;
@@ -2926,7 +3167,7 @@ select.in { padding-right: 30px;
         unitLabel: "serving", unitGrams: 100, qty: 1, per100: e.per100, nutrients: {}, imported: true });
       dates[e.date] = true;
     });
-    if (markDone) Object.keys(dates).forEach(function (k) { if (k < dayKey() && !state.days[k]) state.days[k] = { complete: true, target: TARGETS.kcal }; });
+    if (markDone) Object.keys(dates).forEach(function (k) { if (k < dayKey() && !(state.days[k] && state.days[k].complete)) state.days[k] = Object.assign({}, state.days[k], { complete: true, target: TARGETS.kcal }); });
     save(); render();
     return Object.keys(dates).length;
   }
