@@ -213,6 +213,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .more-btn { align-self: flex-start; color: var(--muted); font-weight: 600; font-size: 14px; padding: 4px 0; }
 .more-btn.big { display: block; width: 100%; height: 50px; margin: 10px 0 4px; border-radius: 14px; background: var(--track); color: var(--fg); font-size: 16px; font-weight: 600; text-align: center; padding: 0; }
 .foot-alt { display: block; width: 100%; margin-top: 8px; text-align: center; }
+.add-more-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 56px; margin-top: 10px; border-radius: 16px; background: var(--track); color: var(--fg); border: 1.5px solid var(--line); font-size: 17px; font-weight: 700; }
+.add-more-btn .plus { font-size: 22px; font-weight: 600; line-height: 1; }
 .tray-bar { background: var(--track); border-radius: 14px; padding: 12px; border-bottom: 0; margin: 6px 0 8px; }
 .tray-list { list-style: none; margin: 0; padding: 0; }
 .tray-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -620,7 +622,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 22</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 23</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1328,7 +1330,7 @@ select.in { padding-right: 30px;
     });
     var add = $("addBtn"), more = $("trayBtn"), tl = $("trayLog");
     if (add && !add.dataset.fixed) add.textContent = "Log " + KINDS[sheetKind].toLowerCase();
-    if (more && !tray.items.length) more.textContent = "+ Add another item to this " + KINDS[sheetKind].toLowerCase();
+    if (more && !tray.items.length) more.innerHTML = '<span class="plus" aria-hidden="true">+</span>Add another item to this ' + KINDS[sheetKind].toLowerCase();
     if (tl) tl.textContent = trayLogLabel();
   }
 
@@ -1684,7 +1686,7 @@ select.in { padding-right: 30px;
     if (tray.items.length) return '<div class="detail-foot"><button class="primary" type="button" id="trayBtn"' + dis + '>Add to ' + kind + ' (' + itemsText(tray.items.length) + ' so far)</button>' +
       '<button class="link-btn foot-alt" type="button" id="addBtn" data-fixed="1"' + dis + '>Log only this item</button></div>';
     return '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + dis + '>Log ' + kind + '</button>' +
-      '<button class="link-btn foot-alt" type="button" id="trayBtn"' + dis + '>+ Add another item to this ' + kind + '</button></div>';
+      '<button class="add-more-btn" type="button" id="trayBtn"' + dis + '><span class="plus" aria-hidden="true">+</span>Add another item to this ' + kind + '</button></div>';
   }
   function bindFoot(fn) {
     $("addBtn").addEventListener("click", function () { fn(false); });
@@ -1759,7 +1761,7 @@ select.in { padding-right: 30px;
           '<span class="k num">' + fmt(entryValue(f, "kcal")) + '</span>' +
           '<button class="tray-x" type="button" data-trayrm="' + i + '" aria-label="Remove ' + esc(shortName(f.name)) + '">✕</button></li>';
       }).join("") + '</ul>' +
-      '<button class="more-btn big" type="button" data-traymore="1">+ Add another item</button>' +
+      '<button class="add-more-btn" type="button" data-traymore="1"><span class="plus" aria-hidden="true">+</span>Add another item</button>' +
       timeFieldHtml() +
       '<div class="nut-card"><div class="nut-kcal"><div class="v num">' + fmt(t.kcal) + '<small>kcal</small></div><div class="est">Total</div></div>' +
         '<div class="nut-grid">' + nutCell("Protein", "var(--protein)", t.protein) + nutCell("Carbs", "var(--carbs)", t.carbs) + nutCell("Fat", "var(--fat)", t.fat) + nutCell("Fiber", "var(--fiber)", t.fiber) + '</div></div>' +
