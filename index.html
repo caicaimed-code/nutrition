@@ -61,8 +61,9 @@
   --shadow: none; color-scheme: dark;
 }
 
-html { -webkit-text-size-adjust: 100%; height: 100%; overflow-x: hidden; touch-action: pan-y; }
-body { margin: 0; min-height: 100%; overflow-x: hidden; overscroll-behavior: none; touch-action: pan-y; }
+html { -webkit-text-size-adjust: 100%; height: 100%; overflow-x: hidden; overscroll-behavior: none; touch-action: pan-y; }
+/* overflow-x: clip (not hidden) so Android Chrome keeps scrolling the page itself */
+body { margin: 0; min-height: 100%; overflow-x: clip; touch-action: pan-y; }
 input, select, textarea, button { touch-action: manipulation; }
 input, select, textarea { max-width: 100%; }
 img { max-width: 100%; }
@@ -513,7 +514,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until Dad's goals are set.</span><br>Food data from USDA FoodData Central.<br><span id="appVersion">Version 8</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until Dad's goals are set.</span><br>Food data from USDA FoodData Central.<br><span id="appVersion">Version 9</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
