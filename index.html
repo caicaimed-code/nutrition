@@ -178,6 +178,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .stepper button { width: 36px; height: 36px; border-radius: 50%; font-size: 20px; font-weight: 600; background: var(--surface); }
 .stepper .q { min-width: 52px; text-align: center; font-weight: 600; }
 .remove { color: var(--warn); font-weight: 600; font-size: 14px; padding: 8px 4px; }
+.fav-btn { color: var(--fg); font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 12px; background: var(--track); border: 1.5px solid var(--line); }
+.fav-form { display: flex; align-items: center; gap: 8px; width: 100%; }
+.fav-form .in { flex: 1; min-width: 0; height: 44px; font-size: 16px; }
+.fav-go { height: 44px; padding: 0 16px; border-radius: 12px; background: var(--fg); color: var(--bg); font-weight: 700; font-size: 15px; flex: none; }
+.group-label .link-btn { float: right; text-transform: none; letter-spacing: 0; padding: 0 0 0 8px; }
+.fav-rm { color: var(--warn); font-weight: 600; font-size: 14px; }
 .empty { color: var(--muted); font-size: 14px; padding: 0 16px 14px; margin: 0; }
 
 .foot-note { color: var(--muted); font-size: 12px; text-align: center; margin: 4px 0 0; }
@@ -671,7 +677,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 30</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 31</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1044,6 +1050,8 @@ select.in { padding-right: 30px;
 
   // ---------- Home screen ----------
   var expanded = null;
+  var saving = null;         // which logged food or meal is being named for Favorites: "e:<id>" or "g:<gid>"
+  var favEdit = false;       // Favorites list in remove mode
   var CIRC = 2 * Math.PI * 52;
   $("ring").style.strokeDasharray = CIRC.toFixed(2);
 
@@ -1118,6 +1126,7 @@ select.in { padding-right: 30px;
                 '</div>' +
                 '<button class="remove" type="button" data-remove="' + e.id + '">Remove</button>' +
               '</div>' +
+              favBox("e:" + e.id, shortName(e.name)) +
             '</div>' : '') +
             '</li>';
         }).join("") + '</ul>'
@@ -1177,6 +1186,7 @@ select.in { padding-right: 30px;
           '</div>' +
         '</div>' +
         '<div class="edit-row"><span></span><button class="remove" type="button" data-gremove="' + esc(u.gid) + '">Remove whole ' + KINDS[kind].toLowerCase() + '</button></div>' +
+        favBox("g:" + u.gid, groupName(u)) +
       '</div>' : '') +
       '</li>';
   }
@@ -1188,7 +1198,17 @@ select.in { padding-right: 30px;
     var b = ev.target.closest("button");
     if (!b) return;
     var id, e;
-    if (b.dataset.gtoggle) { var gk = "g:" + b.dataset.gtoggle; expanded = expanded === gk ? null : gk; render(); return; }
+    if (b.dataset.favstart) { saving = b.dataset.favstart; render(); var fi = $("favName"); if (fi) { fi.focus(); fi.select(); } return; }
+    if (b.dataset.favcancel) { saving = null; render(); return; }
+    if (b.dataset.favgo) {
+      var fItems = favSource(b.dataset.favgo);
+      if (!fItems.length) { saving = null; render(); return; }
+      var fRes = saveFav(($("favName") || {}).value, fItems);
+      saving = null; render();
+      toast((fRes.updated ? "Updated " : "Saved ") + fRes.name + " in Favorites");
+      return;
+    }
+    if (b.dataset.gtoggle) { var gk = "g:" + b.dataset.gtoggle; saving = null; expanded = expanded === gk ? null : gk; render(); return; }
     if (b.dataset.gsetkind) {
       state.entries.forEach(function (x) { if (x.meal === b.dataset.gid) x.kind = b.dataset.gsetkind; });
       save(); render(); return;
@@ -1199,7 +1219,7 @@ select.in { padding-right: 30px;
       state.entries = state.entries.filter(function (x) { return x.meal !== b.dataset.gremove; });
       expanded = null; save(); render(); toast("Removed " + gName); return;
     }
-    if (b.dataset.toggle) { id = +b.dataset.toggle; expanded = expanded === id ? null : id; render(); return; }
+    if (b.dataset.toggle) { id = +b.dataset.toggle; saving = null; expanded = expanded === id ? null : id; render(); return; }
     if (b.dataset.setkind) {
       e = findEntry(+b.dataset.id); if (!e) return;
       e.kind = b.dataset.setkind; save(); render(); return;
@@ -1518,6 +1538,7 @@ select.in { padding-right: 30px;
       '<span class="t"><div class="n">Scan barcode</div><div class="m">Packaged foods in one step</div></span><span class="add" aria-hidden="true">›</span></button>' +
       '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
       '<span class="t"><div class="n">Custom food</div><div class="m">Type your own calories and macros</div></span><span class="add" aria-hidden="true">›</span></button>';
+    html += favRowsHtml(q);
     if (q.length < 2) {
       var rec = recents();
       if (rec.length) {
@@ -1928,6 +1949,80 @@ select.in { padding-right: 30px;
   $("sheetBody").addEventListener("input", function (ev) {
     if (ev.target && ev.target.id === "trayName") { tray.name = ev.target.value; saveTray(); }
   });
+
+  // ---------- Favorites: single foods and saved meals ----------
+  // Stored in settings.saved, so they back up and sync like the rest of the plan.
+  // Each: { id, name, kind: "food" | "meal", items: [food fields: name, serving, amount, nutrition] }
+  var FAV_FIELDS = ["fdcId", "name", "brand", "dataType", "custom", "barcode", "unitLabel", "unitGrams", "qty", "per100", "nutrients"];
+  function favFields(e) {
+    var o = {};
+    FAV_FIELDS.forEach(function (k) { if (e[k] !== undefined) o[k] = JSON.parse(JSON.stringify(e[k])); });
+    return o;
+  }
+  function favList() { return Array.isArray(state.settings.saved) ? state.settings.saved : []; }
+  function favById(id) { return favList().find(function (f) { return f.id === id; }); }
+  function saveFav(name, items) {
+    var kind = items.length > 1 ? "meal" : "food";
+    name = String(name || "").trim().slice(0, 60);
+    if (!name) name = kind === "meal" ? autoMealName(items) : shortName(items[0].name);
+    var list = favList().slice();
+    var i = list.findIndex(function (f) { return f.kind === kind && f.name.toLowerCase() === name.toLowerCase(); });
+    var rec = { id: i >= 0 ? list[i].id : "f" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36), name: name, kind: kind, items: items.map(favFields) };
+    if (i >= 0) list[i] = rec; else list.push(rec);
+    state.settings.saved = list; save();
+    return { name: name, updated: i >= 0 };
+  }
+  // The foods behind a logged card: "g:<meal id>" (a meal) or "e:<entry id>" (one food)
+  function favSource(key) {
+    if (key.slice(0, 2) === "g:") return state.entries.filter(function (x) { return x.meal === key.slice(2); }).sort(function (a, b) { return a.id - b.id; });
+    var e = findEntry(+key.slice(2)); return e ? [e] : [];
+  }
+  function favBox(key, defName) {
+    if (saving === key) {
+      return '<div class="fav-form"><input class="in" id="favName" type="text" maxlength="60" autocomplete="off" value="' + esc(defName) + '" aria-label="Name for Favorites">' +
+        '<button class="fav-go" type="button" data-favgo="' + esc(key) + '">Save</button>' +
+        '<button class="tray-x" type="button" data-favcancel="1" aria-label="Cancel">✕</button></div>';
+    }
+    return '<div class="edit-row"><button class="fav-btn" type="button" data-favstart="' + esc(key) + '">☆ Save to Favorites</button></div>';
+  }
+  function favRowsHtml(q) {
+    var list = favList(), t = q.toLowerCase(), short = q.length < 2;
+    if (!short) list = list.filter(function (f) { return f.name.toLowerCase().indexOf(t) >= 0; });
+    if (!list.length) { if (short) favEdit = false; return ""; }
+    var edit = favEdit && short;
+    return '<div class="group-label">Favorites' + (short ? '<button class="link-btn" type="button" data-favedit="1">' + (edit ? "Done" : "Edit") + '</button>' : '') + '</div>' +
+      '<ul class="food-list">' + list.map(function (f) {
+        var isMeal = f.kind === "meal", kcal = totals(f.items).kcal;
+        var meta = isMeal ? itemsText(f.items.length) + " · " + f.items.map(function (x) { return shortName(x.name); }).join(", ") : servingText(f.items[0]) + (f.items[0].brand ? " · " + f.items[0].brand : "");
+        var attrs = edit ? 'data-favdel="' + esc(f.id) + '"' : (isMeal ? 'data-favmeal="' : 'data-favfood="') + esc(f.id) + '"';
+        return '<li><button class="food" type="button" ' + attrs + '>' +
+          '<span class="t"><div class="n">' + (isMeal ? "🍽 " : "★ ") + esc(f.name) + '</div><div class="m">' + esc(meta) + '</div></span>' +
+          '<span class="k">' + (edit ? '<span class="fav-rm">Remove</span>' : '<b class="num">' + fmt(kcal) + '</b><small>kcal</small>') + '</span></button></li>';
+      }).join("") + '</ul>';
+  }
+  function useFavorite(f) {
+    if (f.kind === "meal") {
+      var wasEmpty = !tray.items.length;
+      f.items.forEach(function (x) { tray.items.push(favFields(x)); });
+      if (wasEmpty) tray.name = f.name;
+      saveTray();
+      toast("Added " + f.name);
+      openTray();
+    } else {
+      openDetailFromEntry(f.items[0]);
+    }
+  }
+  $("sheetBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-favedit],[data-favdel],[data-favmeal],[data-favfood]"); if (!b) return;
+    if (b.dataset.favedit) { favEdit = !favEdit; renderSearchBody(); return; }
+    var f = favById(b.dataset.favdel || b.dataset.favmeal || b.dataset.favfood); if (!f) return;
+    if (b.dataset.favdel) {
+      state.settings.saved = favList().filter(function (x) { return x.id !== f.id; }); save();
+      renderSearchBody(); toast("Removed " + f.name + " from Favorites"); return;
+    }
+    $("search").blur(); useFavorite(f);
+  });
+  window.__nutritionTest.favList = favList;
 
   // ---------- Barcode scanner ----------
   var stopScan = null, scanBusy = false, scanLoading = false;
