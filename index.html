@@ -322,6 +322,8 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .nut-grid .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
 .nut-grid .dot { width: 7px; height: 7px; }
 .source { font-size: 12px; color: var(--muted); }
+.data-warn { font-size: 14px; line-height: 1.4; color: var(--fg); border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 12px; padding: 10px 12px; }
+.data-warn b { color: var(--warn); }
 .detail-foot { position: sticky; bottom: 0; background: linear-gradient(to top, var(--surface) 75%, transparent); padding-top: 12px; }
 .loading-line { font-size: 12px; color: var(--muted); }
 
@@ -534,7 +536,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 13</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 14</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1266,6 +1268,7 @@ select.in { padding-right: 30px;
           }).join("") + '</select>' +
         '</div>' +
         timeFieldHtml() +
+        (current.dataWarn ? '<div class="data-warn" role="alert"><b>⚠️ Heads up.</b> ' + esc(current.dataWarn) + '</div>' : '') +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
         '<div class="source">' + (current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
         '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + (qty > 0 ? '' : ' disabled') + '>Log ' + KINDS[sheetKind].toLowerCase() + '</button></div>' +
@@ -1476,6 +1479,15 @@ select.in { padding-right: 30px;
     return per100FromMap(map);
   }
   window.__nutritionTest.per100FromOff = per100FromOff;
+  // Community data is sometimes entered per package instead of per 100 g/ml.
+  // We never change the numbers; we only warn when they can't be right.
+  function scanDataWarning(p, liquid) {
+    var P = p.protein || 0, C = p.carbs || 0, F = p.fat || 0;
+    if (P + C + F > 105) return "These numbers don't add up: more than 100 g of protein, carbs and fat per 100 " + (liquid ? "ml" : "g") + ". Check the label before logging.";
+    if (liquid && (P > 15 || C > 35)) return "These numbers look too high for a drink. They may be for the whole bottle, not per 100 ml. Check the label before logging.";
+    return null;
+  }
+  window.__nutritionTest.scanDataWarning = scanDataWarning;
   function openOffProduct(prod, code) {
     var per100 = per100FromOff(prod.nutriments);
     if (per100.kcal == null && per100.protein == null && per100.carbs == null && per100.fat == null) { showScanMissing(code, null, "nodata", prod); return; }
@@ -1489,7 +1501,8 @@ select.in { padding-right: 30px;
     current = {
       fdcId: null, name: niceName(prod.product_name || "Scanned food"), brand: niceName(String(prod.brands || "").split(",")[0]),
       dataType: "Open Food Facts", per100: per100, nutrients: {}, units: units, unitIndex: 0, qty: 100, loading: false,
-      barcode: code, scanDefault: { amount: sq > 0 ? sq : 100 }
+      barcode: code, scanDefault: { amount: sq > 0 ? sq : 100 },
+      dataWarn: scanDataWarning(per100, liquid)
     };
     applyScanDefault();
     showView("detail"); renderDetail(); $("sheetBody").scrollTop = 0;
