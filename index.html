@@ -148,7 +148,29 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .item-main .t { min-width: 0; }
 .item-main .n { font-weight: 500; overflow-wrap: anywhere; }
 .item-main .s { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-.item-main .k { font-weight: 600; white-space: nowrap; }
+.item-main .k { font-weight: 600; white-space: nowrap; text-align: right; }
+.item-main .k small { display: block; font-family: var(--font-body); font-size: 11px; font-weight: 500; color: var(--muted); }
+.mrow { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; font-size: 13px; color: var(--muted); }
+.mchip { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mchip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.mchip b { color: var(--fg); font-weight: 600; }
+.sub-item .mrow { font-size: 12px; gap: 2px 10px; margin-top: 3px; }
+.learn-src { padding: 16px 18px; }
+.learn-src h2 { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.learn-src .sub { margin: 3px 0 6px; color: var(--muted); font-size: 13.5px; }
+.src-list { list-style: none; margin: 0; padding: 0; }
+.src-row { display: grid; grid-template-columns: 24px minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.src-row:first-child { border-top: 0; }
+.src-row .rk { width: 24px; height: 24px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+.src-row:first-child .rk { background: var(--c); color: #fff; }
+.src-row .n { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
+.src-row .s { color: var(--muted); font-size: 12.5px; }
+.src-row .sbar { height: 5px; border-radius: 3px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+.src-row .sbar i { display: block; height: 100%; background: var(--c); border-radius: 3px; }
+.src-row .v { text-align: right; white-space: nowrap; }
+.src-row .v b { display: block; font-family: var(--font-display); font-weight: 700; font-size: 17px; }
+.src-row .v small { color: var(--muted); font-size: 12px; }
+.learn-src .foot { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
 .item-edit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 12px 0; }
 .stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-2); border-radius: 999px; padding: 4px; }
 .stepper button { width: 36px; height: 36px; border-radius: 50%; font-size: 20px; font-weight: 600; background: var(--surface); }
@@ -622,7 +644,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 25</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 26</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -892,9 +914,11 @@ select.in { padding-right: 30px;
         if (s && Array.isArray(s.entries)) {
           // Older entries used Breakfast/Lunch/Dinner/Snacks: turn them into Meal/Snack with a time
           s.entries.forEach(function (e) {
+            var oldSlot = typeof e.meal === "string" && (OLD_MEAL_TIME[e.meal] || e.meal === "Snacks");
             if (!e.kind) e.kind = e.meal === "Snacks" ? "snack" : "meal";
-            if (!validTime(e.time)) e.time = OLD_MEAL_TIME[e.meal] || "12:00";
-            delete e.meal;
+            if (!validTime(e.time)) e.time = (oldSlot && OLD_MEAL_TIME[e.meal]) || "12:00";
+            // Only old Breakfast/Lunch/Dinner/Snacks labels are removed; e.meal now links foods logged as one meal
+            if (oldSlot) delete e.meal;
           });
           if (!s.days || typeof s.days !== "object") s.days = {};
           if (!Array.isArray(s.weights)) s.weights = [];
@@ -1029,8 +1053,9 @@ select.in { padding-right: 30px;
                 '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(e.time)) + '</span></div>' +
                 '<div class="n">' + esc(e.name) + '</div>' +
                 '<div class="s">' + esc(servingText(e)) + (e.brand ? ' · ' + esc(e.brand) : '') + '</div>' +
+                macroRow([e]) +
               '</span>' +
-              '<span class="k num">' + fmt(entryValue(e, "kcal")) + '</span>' +
+              '<span class="k num">' + fmt(entryValue(e, "kcal")) + '<small>kcal</small></span>' +
             '</button>' +
             (open ? '<div class="item-edit">' +
               '<div class="edit-row">' +
@@ -1065,6 +1090,18 @@ select.in { padding-right: 30px;
   function groupName(u) { var f = u.items.find(function (x) { return x.mealName; }); return f ? f.mealName : autoMealName(u.items); }
   function groupKcal(u) { return u.items.reduce(function (s, e) { return s + entryValue(e, "kcal"); }, 0); }
   window.__nutritionTest.unitsOf = unitsOf;
+  // Amount of one macro in a list of entries; null when no entry has data for it (shown as "n/a", never guessed)
+  function macroSum(items, key) {
+    var known = false, v = 0;
+    items.forEach(function (e) { if (e.per100 && e.per100[key] != null) { known = true; v += entryValue(e, key); } });
+    return known ? v : null;
+  }
+  function macroRow(items) {
+    return '<div class="mrow">' + MACROS.map(function (m) {
+      var v = macroSum(items, m.key);
+      return '<span class="mchip" style="--c:' + m.color + '"><i></i><b>' + (v == null ? 'n/a' : fmtG(v) + 'g') + '</b>' + m.label.toLowerCase() + '</span>';
+    }).join("") + '</div>';
+  }
   function groupHtml(u) {
     var key = "g:" + u.gid, open = expanded === key, first = u.items[0], kind = first.kind === "snack" ? "snack" : "meal";
     return '<li class="item">' +
@@ -1073,12 +1110,13 @@ select.in { padding-right: 30px;
           '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(first.time)) + '</span></div>' +
           '<div class="n">' + esc(groupName(u)) + '</div>' +
           '<div class="s">' + itemsText(u.items.length) + (open ? '' : ' · tap to see them') + '</div>' +
+          macroRow(u.items) +
         '</span>' +
-        '<span class="k num">' + fmt(groupKcal(u)) + '</span>' +
+        '<span class="k num">' + fmt(groupKcal(u)) + '<small>kcal</small></span>' +
       '</button>' +
       (open ? '<div class="item-edit">' +
         '<ul class="sub-items">' + u.items.map(function (e) {
-          return '<li class="sub-item"><span class="t"><div class="n">' + esc(e.name) + '</div><div class="s">' + esc(servingText(e)) + ' · ' + fmt(entryValue(e, "kcal")) + ' kcal</div></span>' +
+          return '<li class="sub-item"><span class="t"><div class="n">' + esc(e.name) + '</div><div class="s">' + esc(servingText(e)) + ' · ' + fmt(entryValue(e, "kcal")) + ' kcal</div>' + macroRow([e]) + '</span>' +
             '<div class="stepper"><button type="button" data-dec="' + e.id + '" aria-label="Less">−</button><span class="q num">' + fmtQty(e.qty) + '</span><button type="button" data-inc="' + e.id + '" aria-label="More">+</button></div>' +
             '<button class="tray-x" type="button" data-remove="' + e.id + '" aria-label="Remove ' + esc(shortName(e.name)) + '">✕</button></li>';
         }).join("") + '</ul>' +
@@ -1156,8 +1194,7 @@ select.in { padding-right: 30px;
   $("macros").addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-macro]");
     if (!b) return;
-    if (LEARN[b.dataset.macro]) { learnTopic = b.dataset.macro; showTab("learn"); return; }
-    toast(b.querySelector(".name").textContent + " details are coming soon. We're still researching it.");
+    if (LEARN[b.dataset.macro]) { learnTopic = b.dataset.macro; showTab("learn"); }
   });
 
 
@@ -1294,9 +1331,56 @@ select.in { padding-right: 30px;
         '</ol>' +
         '<p class="cite">Some sources have a stake: the bedtime-protein sleep study was funded by dairy and protein companies, and a soy-study co-author writes for a soy industry group. Their numbers match the original studies.</p>');
 
-      return hero + how + tiers + need + speed + plant + hacks + aminos + src;
-    }
+      return hero + sourcesHtml("protein") + how + tiers + need + speed + plant + hacks + aminos + src;
+    },
+    carbs: function () { return macroHero("carbs", "Your main fuel", "Carbs are your body's main fuel, especially for hard training.") + sourcesHtml("carbs") + comingSoon("carbs"); },
+    fat: function () { return macroHero("fat", "Hormones and vitamins", "Fat is needed to make hormones and to absorb vitamins A, D, E and K.") + sourcesHtml("fat") + comingSoon("fat"); },
+    fiber: function () { return macroHero("fiber", "Digestion and fullness", "Fiber is the part of plants you don't digest. It helps digestion and keeps you full.") + sourcesHtml("fiber") + comingSoon("fiber"); }
   };
+  function macroInfo(key) { return MACROS.find(function (m) { return m.key === key; }); }
+  function macroHero(key, title, lead) {
+    var m = macroInfo(key), eaten = totals(entriesFor(selectedDate))[key];
+    return '<section class="card learn-hero">' +
+      '<div class="kicker"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div>' +
+      '<h1>' + title + '</h1><p class="lead">' + lead + '</p>' +
+      '<div class="learn-stats"><div><div class="v num">' + fmtG(eaten) + '<small>g</small></div><div class="k">' + (selectedDate === dayKey() ? "Eaten today" : "Eaten that day") + '</div></div>' +
+      '<div><div class="v num">' + fmt(TARGETS[key]) + '<small>g</small></div><div class="k">' + (realTargets() ? "Your daily target" : "Sample target") + '</div></div></div>' +
+      '</section>';
+  }
+  function comingSoon(key) {
+    return '<section class="card learn-src"><h2>More about ' + macroInfo(key).label.toLowerCase() + ' is coming</h2><p class="sub" style="margin:4px 0 0">We\'re researching it first. The facts will show up here once they\'re checked.</p></section>';
+  }
+  // Which foods gave the most of one macro on the shown day, ranked. Foods without data are listed, not guessed.
+  function sourcesHtml(key) {
+    var m = macroInfo(key), list = entriesFor(selectedDate), isToday = selectedDate === dayKey();
+    var mealOf = {};
+    unitsOf(list).forEach(function (u) { if (u.gid) u.items.forEach(function (e) { mealOf[e.id] = groupName(u); }); });
+    var rows = [], missing = [], zero = 0, total = 0;
+    list.forEach(function (e) {
+      if (!e.per100 || e.per100[key] == null) { missing.push(e); return; }
+      var v = entryValue(e, key);
+      total += v;
+      if (v >= 0.05) rows.push({ e: e, v: v }); else zero++;
+    });
+    rows.sort(function (a, b) { return b.v - a.v; });
+    var head = '<h2>Where your ' + m.label.toLowerCase() + ' came from' + (isToday ? ' today' : '') + '</h2>';
+    if (!list.length) return '<section class="card learn-src" style="--c:' + m.color + '">' + head + '<p class="sub" style="margin:4px 0 0">Nothing logged ' + (isToday ? 'today' : 'that day') + ' yet. Foods show up here ranked from most to least.</p></section>';
+    var body = rows.length ? '<ol class="src-list">' + rows.map(function (x, i) {
+      var pct = total > 0 ? x.v / total * 100 : 0, e = x.e;
+      var sub = [servingText(e), fmtTime(e.time)];
+      if (mealOf[e.id]) sub.push('in ' + mealOf[e.id]);
+      return '<li class="src-row"><span class="rk">' + (i + 1) + '</span>' +
+        '<span class="t"><div class="n">' + esc(e.name) + '</div><div class="s">' + esc(sub.filter(Boolean).join(' · ')) + '</div><div class="sbar"><i style="width:' + pct.toFixed(1) + '%"></i></div></span>' +
+        '<span class="v"><b>' + fmtG(x.v) + ' g</b><small>' + Math.round(pct) + '%</small></span></li>';
+    }).join("") + '</ol>' : '<p class="sub">None of the foods logged had any.</p>';
+    var foot = [];
+    if (zero && rows.length) foot.push(zero + (zero === 1 ? ' food had' : ' foods had') + ' none.');
+    if (missing.length) foot.push('Not available for: ' + missing.map(function (e) { return esc(shortName(e.name)); }).join(', ') + '.');
+    return '<section class="card learn-src" style="--c:' + m.color + '">' + head +
+      '<p class="sub">' + fmtG(total) + ' g of ' + fmt(TARGETS[key]) + ' g · ranked from most to least</p>' + body +
+      (foot.length ? '<p class="foot">' + foot.join(' ') + '</p>' : '') + '</section>';
+  }
+  window.__nutritionTest.sourcesHtml = function (k) { return sourcesHtml(k); };
   function renderLearn() {
     var f = LEARN[learnTopic] || LEARN.protein;
     $("learnBody").innerHTML = f();
