@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Nutrition">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0D1015" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <script>/* Appearance chosen in Settings (this device only), applied before the page draws */
 try { var t0 = localStorage.getItem("dads-nutrition-theme"); if (t0 === "light" || t0 === "dark") document.documentElement.setAttribute("data-theme", t0); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,6 +21,7 @@ try { var t0 = localStorage.getItem("dads-nutrition-theme"); if (t0 === "light" 
 <link rel="preconnect" href="https://api.nal.usda.gov">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
 <style>
+/* Dark mode follows Apple: black background, #1C1C1E cards, white main text, gray (#8E8E93) subtext. */
 /* Layout: one phone-width column. Calorie ring on top, macro tiles, meals, fixed "Log food" bar at the bottom. */
 :root {
   --bg: #F3F5F8;
@@ -48,16 +49,16 @@ try { var t0 = localStorage.getItem("dads-nutrition-theme"); if (t0 === "light" 
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0D1015; --surface: #161A21; --surface-2: #1E232C; --fg: #F1F3F6; --muted: #98A1B2;
-    --line: #262C36; --ink: #F1F3F6; --on-ink: #0D1015; --track: #252B35;
+    --bg: #000000; --surface: #1C1C1E; --surface-2: #2C2C2E; --fg: #FFFFFF; --muted: #8E8E93;
+    --line: #38383A; --ink: #FFFFFF; --on-ink: #000000; --track: #38383A;
     --protein: #F0646A; --carbs: #5B9BF0; --fat: #F0B92E; --fiber: #3BBE80; --warn: #F2804A;
     --good: #36B873; --mid: #F0B92E; --bad: #EE5A62; --low: #9C7BF0;
     --shadow: none; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0D1015; --surface: #161A21; --surface-2: #1E232C; --fg: #F1F3F6; --muted: #98A1B2;
-  --line: #262C36; --ink: #F1F3F6; --on-ink: #0D1015; --track: #252B35;
+  --bg: #000000; --surface: #1C1C1E; --surface-2: #2C2C2E; --fg: #FFFFFF; --muted: #8E8E93;
+  --line: #38383A; --ink: #FFFFFF; --on-ink: #000000; --track: #38383A;
   --protein: #F0646A; --carbs: #5B9BF0; --fat: #F0B92E; --fiber: #3BBE80; --warn: #F2804A;
   --good: #36B873; --mid: #F0B92E; --bad: #EE5A62; --low: #9C7BF0;
   --shadow: none; color-scheme: dark;
@@ -681,7 +682,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 33</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 34</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -2986,7 +2987,7 @@ select.in { padding-right: 30px;
     var metas = document.querySelectorAll('meta[name="theme-color"]');
     Array.prototype.forEach.call(metas, function (m) {
       var dark = /dark/.test(m.getAttribute("media") || "");
-      m.setAttribute("content", t === "light" ? "#F3F5F8" : t === "dark" ? "#0D1015" : (dark ? "#0D1015" : "#F3F5F8"));
+      m.setAttribute("content", t === "light" ? "#F3F5F8" : t === "dark" ? "#000000" : (dark ? "#000000" : "#F3F5F8"));
     });
   }
   function setTheme(t) { try { if (t === "auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, t); } catch (e) {} applyTheme(t); }
