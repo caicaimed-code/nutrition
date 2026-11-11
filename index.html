@@ -604,7 +604,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 19</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 20</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -636,6 +636,7 @@ select.in { padding-right: 30px;
   <div id="planBody"></div>
   <div id="backupBody" class="cal-page" hidden></div>
   <div id="importBody" class="cal-page" hidden></div>
+  <div id="gsBody" class="cal-page" hidden></div>
 </div>
 
 <div class="app cal-page" id="learnPage" hidden>
@@ -891,7 +892,7 @@ select.in { padding-right: 30px;
     } catch (e) {}
     return { version: 2, entries: [], days: {}, weights: [], settings: defaultSettings() };
   }
-  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast("Couldn't save on this phone. Storage may be full."); } cloudAfterSave(); }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast("Couldn't save on this phone. Storage may be full."); } cloudAfterSave(); if (window.__gsAfterSave) window.__gsAfterSave(); }
   try { localStorage.removeItem("dads-nutrition-preview-v1"); } catch (e) {}
   function nextId() { return state.entries.reduce(function (m, e) { return Math.max(m, e.id); }, 0) + 1; }
   function entriesFor(k) { return state.entries.filter(function (e) { return e.date === k; }); }
@@ -2479,6 +2480,7 @@ select.in { padding-right: 30px;
     $("planTop").hidden = planView === "home";
     $("backupBody").hidden = planView !== "backup";
     $("importBody").hidden = planView !== "backup";
+    $("gsBody").hidden = planView !== "backup";
   }
   var planView = "home";
   function planBoxes(s, w, c, goal, hit, missing) {
@@ -2504,7 +2506,7 @@ select.in { padding-right: 30px;
     if (!cloudUser) return "Off. Tap to sign in and back up your data.";
     return (cloudState === "ok" ? "Backed up" : cloudState === "error" ? "Not backed up yet" : "Backing up…") + " · " + cloudUser.email;
   }
-  function openPlanView(v) { planView = v; renderPlan(); renderBackup(); if (v === "backup") renderImport(); window.scrollTo(0, 0); }
+  function openPlanView(v) { planView = v; renderPlan(); renderBackup(); if (v === "backup") { renderImport(); renderGs(); } window.scrollTo(0, 0); }
   $("planBack").addEventListener("click", function () { openPlanView("home"); });
 
   var planTimer = null, planAnim = false;
@@ -2615,7 +2617,7 @@ select.in { padding-right: 30px;
       if (c.date != null && c.kcal != null) { hi = r; col = c; }
     }
     if (hi < 0) { out.error = "Couldn't find the column titles. Copy the title row too: it needs Date and Calories columns."; return out; }
-    var perDay = {}, today = dayKey();
+    var perDay = {}, lastTime = {}, today = dayKey();
     rows.slice(hi + 1).forEach(function (row) {
       var date = importDate(row[col.date]), kcal = importNum(row[col.kcal]);
       var name = String(col.name != null ? row[col.name] || "" : "").replace(/\s+/g, " ").trim();
@@ -2624,6 +2626,10 @@ select.in { padding-right: 30px;
       perDay[date]++;
       var time = IMPORT_SLOTS[Math.min(i, IMPORT_SLOTS.length - 1)];
       IMPORT_TIMES.forEach(function (p) { if (p[0].test(name)) time = p[1]; });
+      // Keep the spreadsheet's order: each row at least 30 minutes after the one before it
+      var prev = lastTime[date];
+      if (prev && time <= prev) { var mins = Math.min(23 * 60 + 59, +prev.slice(0, 2) * 60 + +prev.slice(3) + 30); time = String(Math.floor(mins / 60)).padStart(2, "0") + ":" + String(mins % 60).padStart(2, "0"); }
+      lastTime[date] = time;
       out.entries.push({
         date: date, name: name || "Imported food", time: time, kind: /^snack/i.test(name) ? "snack" : "meal",
         per100: { kcal: kcal, protein: col.protein != null ? importNum(row[col.protein]) : null, carbs: col.carbs != null ? importNum(row[col.carbs]) : null,
@@ -2938,6 +2944,108 @@ select.in { padding-right: 30px;
   window.addEventListener("online", function () { if (cloudUser) cloudRun("push"); });
   startCloud();
   window.__nutritionTest.cloudSync = function () { return sync; };
+
+  // ---------- Google Sheet copy (optional, per person) ----------
+  // Sends each changed day to a Google Apps Script web app the person set up in their own sheet.
+  // The script replaces that day's rows in the "Log" tab: Date, Meal, Protein, Calories, Carbs, Fat, Fiber.
+  // The web app address and key live only in this person's settings, never in the app's code.
+  var GS_KEY = "dads-nutrition-sheet";
+  var gs = (function () { try { return JSON.parse(localStorage.getItem(GS_KEY)) || {}; } catch (e) { return {}; } })();
+  function saveGs() { try { localStorage.setItem(GS_KEY, JSON.stringify(gs)); } catch (e) {} }
+  var gsTimer = null, gsBusy = false, gsAgain = false;
+  function gsCfg() { var c = state.settings.sheet; return c && c.url && c.key ? c : null; }
+  function r1n(v) { return v == null ? "" : Math.round(v * 10) / 10; }
+  function gsRowsFor(k) {
+    return entriesFor(k).slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : a.id - b.id; }).map(function (e) {
+      var g = e.unitGrams * e.qty, v = function (key) { var x = amountFor(e.per100, g, key); return x == null ? "" : r1n(x); };
+      var label = e.imported ? e.name : e.name + (e.brand ? " (" + e.brand + ")" : "") + " · " + servingText(e);
+      if (e.kind === "snack" && !/^snack/i.test(label)) label = "Snack: " + label;
+      return [k, label, v("protein"), v("kcal"), v("carbs"), v("fat"), v("fiber")];
+    });
+  }
+  window.__nutritionTest.gsRowsFor = gsRowsFor;
+  function gsChangedDays() {
+    var seen = {}, out = {}, sent = gs.sent || {};
+    state.entries.forEach(function (e) { seen[e.date] = true; });
+    Object.keys(sent).forEach(function (k) { seen[k] = true; });
+    Object.keys(seen).forEach(function (k) {
+      var rows = gsRowsFor(k), h = hashOf(rows);
+      if (sent[k] !== h) out[k] = { rows: rows, hash: h };
+    });
+    return out;
+  }
+  function gsPost(cfg, days) {
+    var body = JSON.stringify({ key: cfg.key, days: days });
+    return fetch(cfg.url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (!j || !j.ok) throw new Error(j && j.error === "wrong key" ? "The key doesn't match the one in the sheet's script." : (j && j.error) || "The sheet didn't accept it."); return true; },
+        function (err) {
+          if (err && /key|accept/.test(err.message || "")) throw err;
+          if (!err || err.name !== "TypeError") throw new Error("The sheet's web app didn't answer correctly. Check it's deployed with access set to Anyone.");
+          // Some browsers can't read Google's reply. Send again without reading it; the sheet still gets it.
+          return fetch(cfg.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: body }).then(function () { return "unconfirmed"; });
+        });
+  }
+  function gsRun() {
+    var cfg = gsCfg(); if (!cfg) return;
+    if (gsBusy) { gsAgain = true; return; }
+    var changed = gsChangedDays(), keys = Object.keys(changed).sort();
+    if (!keys.length) return;
+    if (!navigator.onLine) { gs.error = "No internet. It will update the sheet when you're back online."; saveGs(); renderGsStatus(); return; }
+    gsBusy = true; renderGsStatus();
+    var batch = keys.slice(0, 60), days = {};
+    batch.forEach(function (k) { days[k] = changed[k].rows; });
+    gsPost(cfg, days).then(function (res) {
+      gs.sent = gs.sent || {};
+      batch.forEach(function (k) { if (changed[k].rows.length) gs.sent[k] = changed[k].hash; else delete gs.sent[k]; });
+      gs.last = Date.now(); gs.error = ""; gs.unconfirmed = res === "unconfirmed"; saveGs();
+      gsBusy = false; renderGsStatus();
+      if (gsAgain || keys.length > batch.length) { gsAgain = false; gsRun(); }
+    }, function (err) {
+      gs.error = (err && err.message) || "Couldn't reach the sheet."; saveGs();
+      gsBusy = false; gsAgain = false; renderGsStatus();
+    });
+  }
+  window.__gsAfterSave = function () { if (!gsCfg()) return; clearTimeout(gsTimer); gsTimer = setTimeout(gsRun, 3000); };
+  window.__nutritionTest.gsRun = gsRun; window.__nutritionTest.gsState = function () { return gs; };
+  function gsStatusText() {
+    if (gsBusy) return "⏳ Updating the sheet…";
+    if (gs.error) return "⚠️ " + gs.error;
+    if (gs.last) return "✅ Sheet updated " + timeText(gs.last) + (gs.unconfirmed ? " (sent; your browser can't read Google's reply)" : "");
+    return "Waiting for the first update.";
+  }
+  function renderGsStatus() { var el = $("gsStatus"); if (el) el.textContent = gsStatusText(); }
+  function renderGs() {
+    var box = $("gsBody"); if (!box) return;
+    var cfg = gsCfg();
+    box.innerHTML = '<section class="card plan-card">' +
+      '<div><b style="font-family:var(--font-display);font-size:17px">Google Sheet copy</b></div>' +
+      (cfg
+        ? '<p class="note" style="margin:0;font-size:14px;color:var(--fg)">Every food you log, change or remove here also updates your sheet\'s Log tab.</p>' +
+          '<div class="imp-sum" id="gsStatus" role="status"></div>' +
+          '<div class="btn-row"><button class="ghost-btn" type="button" id="gsAll">Send everything again</button><button class="ghost-btn" type="button" id="gsOff">Turn off</button></div>'
+        : '<p class="note" style="margin:0;font-size:14px;color:var(--fg)">Optional. Keep a copy of your log in your own Google Sheet. Set up the sheet\'s script first, then paste its web app address and key here.</p>' +
+          '<div><label class="lab" for="gsUrl">Web app address</label><input class="in" id="gsUrl" type="url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></div>' +
+          '<div><label class="lab" for="gsKeyIn">Key</label><input class="in" id="gsKeyIn" type="text" autocapitalize="none" spellcheck="false"></div>' +
+          '<p class="form-err" id="gsErr" role="alert" hidden></p>' +
+          '<button class="primary" type="button" id="gsSave">Connect sheet</button>') +
+      '</section>';
+    renderGsStatus();
+  }
+  $("gsBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    if (b.id === "gsSave") {
+      var url = $("gsUrl").value.trim(), key = $("gsKeyIn").value.trim();
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) { $("gsErr").hidden = false; $("gsErr").textContent = "That doesn't look like a web app address. It starts with https://script.google.com/macros/s/ and ends with /exec."; return; }
+      if (key.length < 8) { $("gsErr").hidden = false; $("gsErr").textContent = "Paste the key from the script."; return; }
+      state.settings.sheet = { url: url, key: key }; gs = { sent: {} }; saveGs(); save(); renderGs(); gsRun();
+    } else if (b.id === "gsAll") { gs.sent = {}; saveGs(); gsRun(); }
+    else if (b.id === "gsOff") { delete state.settings.sheet; gs = {}; saveGs(); save(); renderGs(); toast("Sheet copy turned off"); }
+  });
+  setTimeout(gsRun, 4000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) setTimeout(gsRun, 2500); });
+  window.addEventListener("online", function () { gsRun(); });
+
 
   // New day while the app stays open
   var lastDay = dayKey();
