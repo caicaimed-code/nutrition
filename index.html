@@ -644,7 +644,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 26</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 27</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -656,8 +656,8 @@ select.in { padding-right: 30px;
   </div>
   <div id="calBody"></div>
   <div class="legend" aria-label="Color key">
-    <span><i class="status-dot" style="--c:var(--good)"></i><span id="lgGood">At or under target</span></span>
-    <span><i class="status-dot" style="--c:var(--mid)"></i><span id="lgMid">Up to 250 over</span></span>
+    <span><i class="status-dot" style="--c:var(--good)"></i><span id="lgGood">Under target or up to 150 over</span></span>
+    <span><i class="status-dot" style="--c:var(--mid)"></i><span id="lgMid">150 to 250 over</span></span>
     <span><i class="status-dot" style="--c:var(--bad)"></i><span id="lgBad">More than 250 over</span></span>
     <span><i class="status-dot" style="--c:var(--low)"></i>Ate too little</span>
     <span><i class="status-dot" style="--c:var(--track);box-shadow:inset 0 0 0 2px var(--muted)"></i>Not marked complete</span>
@@ -735,6 +735,7 @@ select.in { padding-right: 30px;
   // Under this on a completed day = ate too little (purple). Common minimums: 1,500 for men, 1,200 for women.
   function floorKcal() { return state && state.settings && state.settings.sex === "female" ? 1200 : 1500; }
   var OVER_YELLOW = 250;   // up to this many kcal over target = yellow, beyond = red
+  var CUSHION = 150;       // within this many kcal of target still counts as on target (Caio's choice)
   var API_KEY = "mW7hWGzTbNFGcDbCPKpmcfgq6NFwfgTRdcnzqJqT";
   var API = "https://api.nal.usda.gov/fdc/v1";
   var STORE_KEY = "dads-nutrition-v2";
@@ -968,21 +969,22 @@ select.in { padding-right: 30px;
     STATUS.mid.label = up ? "A little under" : "A little over";
     STATUS.bad.label = up ? "Under target" : "Over target";
     if ($("lgGood")) {
-      $("lgGood").textContent = up ? "At or over target" : "At or under target";
-      $("lgMid").textContent = up ? "Up to 250 under" : "Up to 250 over";
+      $("lgGood").textContent = up ? "Over target or up to 150 under" : "Under target or up to 150 over";
+      $("lgMid").textContent = up ? "150 to 250 under" : "150 to 250 over";
       $("lgBad").textContent = up ? "More than 250 under" : "More than 250 over";
     }
   }
   function statusFor(kcal, target, complete, hasEntries) {
     if (!complete) return hasEntries ? "open" : "none";
     kcal = Math.round(kcal);
-    if (kcal < floorKcal()) return "low";
+    // Purple only when far below both the safe minimum and the person's own target
+    if (kcal < floorKcal() && kcal < target - CUSHION) return "low";
     if (surplusGoal()) {
-      if (kcal >= target) return "good";
+      if (kcal >= target - CUSHION) return "good";
       if (kcal >= target - OVER_YELLOW) return "mid";
       return "bad";
     }
-    if (kcal <= target) return "good";
+    if (kcal <= target + CUSHION) return "good";
     if (kcal <= target + OVER_YELLOW) return "mid";
     return "bad";
   }
