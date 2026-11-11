@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Dad's Nutrition</title>
+<title>Nutrition</title>
 <meta name="description" content="Daily food and nutrition tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -458,6 +458,17 @@ select.in { padding-right: 30px;
   background-position: calc(100% - 17px) 21px, calc(100% - 12px) 21px; background-size: 5px 5px; background-repeat: no-repeat; }
 .ft-in { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .note { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.backup-row { display: flex; align-items: center; gap: 12px; }
+.backup-row b { display: block; font-size: 16px; }
+.backup-row small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.bdot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--muted); }
+.bdot.ok { background: var(--good); }
+.bdot.busy { background: var(--mid); }
+.bdot.err { background: var(--bad); }
+.btn-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.ghost-btn { height: 48px; border-radius: 14px; background: var(--track); color: var(--fg); font-size: 15px; font-weight: 600; }
+.ghost-btn:disabled { opacity: .5; }
+.form-err { color: var(--bad); font-size: 14px; margin: 0; }
 
 /* Toast */
 .toast {
@@ -490,7 +501,7 @@ select.in { padding-right: 30px;
   </header>
 
   <section class="card cal" aria-label="Calories">
-    <span class="chip sample" title="Targets are placeholders until Dad's real goals are set">Sample target</span>
+    <span class="chip sample" title="Targets are samples until the Plan tab is set up">Sample target</span>
     <div class="ring-wrap">
       <svg viewBox="0 0 120 120" aria-hidden="true">
         <circle class="ring-track" cx="60" cy="60" r="52"></circle>
@@ -514,7 +525,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until Dad's goals are set.</span><br>Food data from USDA FoodData Central.<br><span id="appVersion">Version 9</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 10</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -543,6 +554,7 @@ select.in { padding-right: 30px;
 <div class="app cal-page" id="planPage" hidden>
   <h1 class="page-title">Plan</h1>
   <div id="planBody"></div>
+  <div id="backupBody" class="cal-page" style="margin-top:14px"></div>
 </div>
 
 <nav class="tabbar" aria-label="Main">
@@ -593,7 +605,8 @@ select.in { padding-right: 30px;
   // ---------- Settings ----------
   var SAMPLE_TARGETS = { kcal: 2000, protein: 150, carbs: 200, fat: 67, fiber: 30 }; // used until a pace is picked in Plan
   var TARGETS = Object.assign({}, SAMPLE_TARGETS);
-  var FLOOR_KCAL = 1500;   // under this on a completed day = ate too little (purple). Placeholder.
+  // Under this on a completed day = ate too little (purple). Common minimums: 1,500 for men, 1,200 for women.
+  function floorKcal() { return state && state.settings && state.settings.sex === "female" ? 1200 : 1500; }
   var OVER_YELLOW = 250;   // up to this many kcal over target = yellow, beyond = red
   var API_KEY = "mW7hWGzTbNFGcDbCPKpmcfgq6NFwfgTRdcnzqJqT";
   var API = "https://api.nal.usda.gov/fdc/v1";
@@ -730,8 +743,8 @@ select.in { padding-right: 30px;
 
   // ---------- Storage ----------
   function defaultSettings() {
-    // Placeholders until Dad confirms his real numbers
-    return { sex: "male", birth: "1977-04-15", heightIn: 72, startLb: 195, activity: "mod", pace: null, goalLb: null };
+    // Blank until the person enters their own stats in the Plan tab
+    return { sex: null, birth: "", heightIn: null, startLb: null, activity: "mod", pace: null, goalLb: null };
   }
   var state = load();
   if (state.entries.length) save(); // keep migrated entries
@@ -750,13 +763,18 @@ select.in { padding-right: 30px;
           if (!s.days || typeof s.days !== "object") s.days = {};
           if (!Array.isArray(s.weights)) s.weights = [];
           s.settings = Object.assign(defaultSettings(), s.settings || {});
+          // Old builds pre-filled sample stats. Clear them if nobody picked a pace yet.
+          var o = s.settings;
+          if (o.pace == null && o.sex === "male" && o.birth === "1977-04-15" && o.heightIn === 72 && o.startLb === 195) {
+            o.sex = null; o.birth = ""; o.heightIn = null; o.startLb = null;
+          }
           return s;
         }
       }
     } catch (e) {}
     return { version: 2, entries: [], days: {}, weights: [], settings: defaultSettings() };
   }
-  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast("Couldn't save on this phone. Storage may be full."); } }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast("Couldn't save on this phone. Storage may be full."); } cloudAfterSave(); }
   try { localStorage.removeItem("dads-nutrition-preview-v1"); } catch (e) {}
   function nextId() { return state.entries.reduce(function (m, e) { return Math.max(m, e.id); }, 0) + 1; }
   function entriesFor(k) { return state.entries.filter(function (e) { return e.date === k; }); }
@@ -786,7 +804,7 @@ select.in { padding-right: 30px;
   function statusFor(kcal, target, complete, hasEntries) {
     if (!complete) return hasEntries ? "open" : "none";
     kcal = Math.round(kcal);
-    if (kcal < FLOOR_KCAL) return "low";
+    if (kcal < floorKcal()) return "low";
     if (kcal <= target) return "good";
     if (kcal <= target + OVER_YELLOW) return "mid";
     return "bad";
@@ -815,8 +833,9 @@ select.in { padding-right: 30px;
     $("dayTitle").textContent = dayName(selectedDate);
     $("date").textContent = longDate(selectedDate);
     $("todayLink").hidden = isToday;
-    document.querySelector(".cal .sample").hidden = state.settings.pace != null;
-    $("targetNote").textContent = state.settings.pace != null ? "Targets come from the Plan tab." : "Targets are samples until a pace is picked in Plan.";
+    var real = realTargets();
+    document.querySelector(".cal .sample").hidden = real;
+    $("targetNote").textContent = real ? "Targets come from the Plan tab." : "Targets are samples until you enter your stats and pick a pace in Plan.";
     $("nextDay").disabled = isToday;
     renderComplete();
     var ring = $("ring");
@@ -992,7 +1011,7 @@ select.in { padding-right: 30px;
 
   function apiError(status) {
     if (status === 429) return { title: "Too many searches right now", text: "The food database limits searches per hour. Try again in a little while." };
-    if (status === 403 || status === 401) return { title: "Food search isn't connected", text: "The database key was refused. Tell Caio so he can fix it." };
+    if (status === 403 || status === 401) return { title: "Food search isn't connected", text: "The food database refused the request. Try again later." };
     return { title: "Search didn't work", text: "The food database had a problem. Try again in a moment." };
   }
 
@@ -1432,7 +1451,7 @@ select.in { padding-right: 30px;
       var st = STATUS[info.status];
       box.innerHTML = '<div class="done-row"><span class="status-pill"><span class="status-dot" style="--c:' + st.color + '"></span>' +
         'Day complete · ' + st.label + '</span><button class="link-btn" type="button" id="reopenBtn">Undo</button></div>' +
-        '<p>' + fmt(info.kcal) + ' of ' + fmt(info.target) + ' kcal.' + (info.status === "low" ? ' Under ' + fmt(FLOOR_KCAL) + ' kcal is too little to fuel the day.' : '') + '</p>';
+        '<p>' + fmt(info.kcal) + ' of ' + fmt(info.target) + ' kcal.' + (info.status === "low" ? ' Under ' + fmt(floorKcal()) + ' kcal is too little to fuel the day.' : '') + '</p>';
     }
   }
   var COMPLETE_MSG = { good: "Day complete. On target!", mid: "Day complete. Just a little over.", bad: "Day complete. Tomorrow is a fresh start.", low: "Day complete. That was too little food." };
@@ -1470,7 +1489,7 @@ select.in { padding-right: 30px;
     });
     if (t === "cal") { calDate = selectedDate; renderCalendar(); }
     else if (t === "weight") renderWeight();
-    else if (t === "plan") renderPlan();
+    else if (t === "plan") { renderPlan(); renderBackup(); }
     else render();
     window.scrollTo(0, 0);
   }
@@ -1732,8 +1751,17 @@ select.in { padding-right: 30px;
     if (d.getMonth() < b.getMonth() || (d.getMonth() === b.getMonth() && d.getDate() < b.getDate())) a--;
     return a;
   }
+  function statsMissing(s, weightLb) {
+    var m = [];
+    if (!s.sex) m.push("sex");
+    if (!s.birth) m.push("birth date");
+    if (!s.heightIn) m.push("height");
+    if (!weightLb) m.push("weight");
+    return m;
+  }
   function calc(settings, weightLb) {
-    var s = settings, kg = weightLb * 0.453592, cm = s.heightIn * 2.54, age = ageOn(s.birth) || 40;
+    if (statsMissing(settings, weightLb).length) return null;
+    var s = settings, kg = weightLb * 0.453592, cm = s.heightIn * 2.54, age = ageOn(s.birth);
     var bmr = 10 * kg + 6.25 * cm - 5 * age + (s.sex === "female" ? -161 : 5);
     var act = ACTIVITY.find(function (a) { return a.id === s.activity; }) || ACTIVITY[2];
     var maint = bmr * act.f;
@@ -1748,63 +1776,72 @@ select.in { padding-right: 30px;
   }
   function applyTargets() {
     var s = state.settings;
-    if (s.pace == null) { Object.assign(TARGETS, SAMPLE_TARGETS); return; }
     var w = currentWeight(), c = calc(s, w);
+    if (s.pace == null || !c) { Object.assign(TARGETS, SAMPLE_TARGETS); return; }
     var hit = c.paces.find(function (x) { return x.pace.id === s.pace; }) || c.paces[2];
     Object.assign(TARGETS, macroTargets(hit.kcal, w));
   }
+  function realTargets() { return state.settings.pace != null && !!calc(state.settings, currentWeight()); }
   window.__nutritionTest.calc = calc; window.__nutritionTest.macroTargets = macroTargets; window.__nutritionTest.ageOn = ageOn;
 
   function renderPlan() {
     var s = state.settings, w = currentWeight(), c = calc(s, w), hasWeigh = state.weights.length > 0;
-    var html = '<section class="card plan-card">' +
+    var missing = statsMissing(s, w);
+    var top = '<section class="card plan-card">' +
       '<div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Daily calorie target</div>' +
       '<div class="target-big num">' + fmt(TARGETS.kcal) + '<small>kcal</small></div>' +
-      '<p class="note">' + (s.pace == null ? "This is a sample target. Pick a pace below to set his real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. The target below it is what creates the weight loss.") + '</p>' +
+      '<p class="note">' + (!c ? "This is a sample target. Enter your stats below to get your own." : s.pace == null ? "This is a sample target. Pick a pace below to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. The target below it is what creates the weight loss.") + '</p>' +
       '</section>';
 
-    html += '<div class="section-h"><h2>Choose a pace</h2><span>Maintenance ≈ ' + fmt(c.maint) + '</span></div>';
-    html += '<section class="card plan-card" role="radiogroup" aria-label="Weight loss pace">' + c.paces.map(function (x) {
-      var p = x.pace, low = x.kcal < FLOOR_KCAL;
-      var sub = p.aggressive ? '<small class="warn">Very strict and not recommended. Losing this fast makes losing muscle more likely.</small>'
-        : p.lb === 0 ? '<small>Stay at the current weight</small>'
-        : p.lb === 1 ? '<small>A solid pace for losing fat while keeping muscle</small>'
-        : '<small>Slow and easy to stick with</small>';
-      if (low) sub += '<small class="warn" style="display:block">Below ' + fmt(FLOOR_KCAL) + ' kcal. Too low.</small>';
-      return '<button class="pace" type="button" role="radio" data-pace="' + p.id + '" aria-checked="' + (s.pace === p.id) + '">' +
-        '<span class="radio" aria-hidden="true"></span>' +
-        '<span class="t"><b>' + p.label + (p.aggressive ? '<span class="tag aggr">Aggressive</span>' : '') + '</b>' + sub + '</span>' +
-        '<span class="k num">' + fmt(x.kcal) + '<small>kcal a day</small></span></button>';
-    }).join("") + '</section>';
+    var paces = "", macros = "";
+    if (c) {
+      paces = '<div class="section-h"><h2>Choose a pace</h2><span>Maintenance ≈ ' + fmt(c.maint) + '</span></div>' +
+        '<section class="card plan-card" role="radiogroup" aria-label="Weight loss pace">' + c.paces.map(function (x) {
+        var p = x.pace, low = x.kcal < floorKcal();
+        var sub = p.aggressive ? '<small class="warn">Very strict and not recommended. Losing this fast makes losing muscle more likely.</small>'
+          : p.lb === 0 ? '<small>Stay at the current weight</small>'
+          : p.lb === 1 ? '<small>A solid pace for losing fat while keeping muscle</small>'
+          : '<small>Slow and easy to stick with</small>';
+        if (low) sub += '<small class="warn" style="display:block">Below ' + fmt(floorKcal()) + ' kcal. Too low.</small>';
+        return '<button class="pace" type="button" role="radio" data-pace="' + p.id + '" aria-checked="' + (s.pace === p.id) + '">' +
+          '<span class="radio" aria-hidden="true"></span>' +
+          '<span class="t"><b>' + p.label + (p.aggressive ? '<span class="tag aggr">Aggressive</span>' : '') + '</b>' + sub + '</span>' +
+          '<span class="k num">' + fmt(x.kcal) + '<small>kcal a day</small></span></button>';
+      }).join("") + '</section>';
 
-    var mt = s.pace != null ? TARGETS : macroTargets((c.paces[2]).kcal, w);
-    html += '<div class="section-h"><h2>Macro targets</h2><span>' + (s.pace != null ? "In use" : "Preview at 1 lb a week") + '</span></div>' +
-      '<section class="card plan-card"><div class="macro-targets">' + MACROS.map(function (m) {
-        return '<div><div class="v num">' + fmt(mt[m.key]) + '<span style="font-size:12px"> g</span></div><div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div></div>';
-      }).join("") + '</div>' +
-      '<p class="note">Protein is 0.8 g per pound of body weight, inside the range research supports for keeping muscle while losing fat. Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest.</p></section>';
+      var mt = s.pace != null ? TARGETS : macroTargets((c.paces[2]).kcal, w);
+      macros = '<div class="section-h"><h2>Macro targets</h2><span>' + (s.pace != null ? "In use" : "Preview at 1 lb a week") + '</span></div>' +
+        '<section class="card plan-card"><div class="macro-targets">' + MACROS.map(function (m) {
+          return '<div><div class="v num">' + fmt(mt[m.key]) + '<span style="font-size:12px"> g</span></div><div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div></div>';
+        }).join("") + '</div>' +
+        '<p class="note">Protein is 0.8 g per pound of body weight, inside the range research supports for keeping muscle while losing fat. Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest.</p></section>';
+    }
 
-    var ft = Math.floor(s.heightIn / 12), inch = s.heightIn % 12;
-    html += '<div class="section-h"><h2>About Dad</h2><span>Placeholders until confirmed</span></div>' +
-      '<section class="card plan-card"><div class="form-grid">' +
+    var ft = s.heightIn ? Math.floor(s.heightIn / 12) : null, inch = s.heightIn ? s.heightIn % 12 : 0;
+    var stats = '<div class="section-h"><h2>Your stats</h2><span>' + (missing.length ? "Needed for your target" : "Used for your targets") + '</span></div>' +
+      '<section class="card plan-card">' +
+        (missing.length ? '<p class="note" style="font-size:14px;color:var(--fg)">Still needed: ' + missing.join(", ") + '.</p>' : '') +
+        '<div class="form-grid">' +
         '<div class="full"><span class="lab">Sex</span><div class="seg" id="sexSeg" role="group" aria-label="Sex">' +
           '<button type="button" data-sex="male" aria-pressed="' + (s.sex === "male") + '">Male</button><button type="button" data-sex="female" aria-pressed="' + (s.sex === "female") + '">Female</button></div></div>' +
         '<div><label class="lab" for="pBirth">Birth date</label><input class="in" id="pBirth" type="date" value="' + esc(s.birth || "") + '" max="' + dayKey() + '"></div>' +
-        '<div><span class="lab">Age</span><div class="in num" style="display:flex;align-items:center;background:none;border-color:transparent;padding:0">' + (c.age != null ? c.age + ' years' : '–') + '</div></div>' +
+        '<div><span class="lab">Age</span><div class="in num" style="display:flex;align-items:center;background:none;border-color:transparent;padding:0">' + (s.birth ? ageOn(s.birth) + ' years' : '–') + '</div></div>' +
         '<div class="full"><span class="lab">Height</span><div class="ft-in">' +
-          '<select class="in" id="pFt" aria-label="Feet">' + [4, 5, 6, 7].map(function (f) { return '<option value="' + f + '"' + (f === ft ? ' selected' : '') + '>' + f + ' ft</option>'; }).join("") + '</select>' +
+          '<select class="in" id="pFt" aria-label="Feet">' + (ft == null ? '<option value="" selected>– ft</option>' : '') + [4, 5, 6, 7].map(function (f) { return '<option value="' + f + '"' + (f === ft ? ' selected' : '') + '>' + f + ' ft</option>'; }).join("") + '</select>' +
           '<select class="in" id="pIn" aria-label="Inches">' + Array.from({ length: 12 }, function (_, i) { return '<option value="' + i + '"' + (i === inch ? ' selected' : '') + '>' + i + ' in</option>'; }).join("") + '</select>' +
         '</div></div>' +
         (hasWeigh
           ? '<div class="full"><span class="lab">Weight</span><p class="note" style="font-size:14px;color:var(--fg)">' + fmtLb(w) + ' lb trend weight, from the Weight tab</p></div>'
-          : '<div><label class="lab" for="pStart">Weight (lb)</label><input class="in num-in" id="pStart" type="text" inputmode="decimal" value="' + esc(s.startLb) + '"></div><div style="align-self:end"><p class="note">Log weigh-ins in the Weight tab to use the trend instead.</p></div>') +
+          : '<div><label class="lab" for="pStart">Weight (lb)</label><input class="in num-in" id="pStart" type="text" inputmode="decimal" placeholder="e.g. 170" value="' + esc(s.startLb == null ? "" : s.startLb) + '"></div><div style="align-self:end"><p class="note">Log weigh-ins in the Weight tab to use the trend instead.</p></div>') +
         '<div class="full"><label class="lab" for="pAct">Activity</label><select class="in" id="pAct">' + ACTIVITY.map(function (a) {
           return '<option value="' + a.id + '"' + (a.id === s.activity ? ' selected' : '') + '>' + a.label + ': ' + a.desc + '</option>';
         }).join("") + '</select></div>' +
         '<div><label class="lab" for="pGoal">Goal weight (lb)</label><input class="in num-in" id="pGoal" type="text" inputmode="decimal" placeholder="Optional" value="' + esc(s.goalLb == null ? "" : s.goalLb) + '"></div>' +
       '</div></section>';
 
-    html += '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below it. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with his doctor before starting.</p></section>';
+    var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below it. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with your doctor before starting, especially with any health condition.</p></section>';
+
+    var html = c ? top + paces + macros + stats + how : top + stats + how;
     $("planBody").innerHTML = '<div class="cal-page">' + html + '</div>';
   }
 
@@ -1825,7 +1862,7 @@ select.in { padding-right: 30px;
   $("planBody").addEventListener("change", function (ev) {
     var t = ev.target, s = state.settings, n;
     if (t.id === "pBirth" && t.value) s.birth = t.value;
-    else if (t.id === "pFt" || t.id === "pIn") s.heightIn = (+$("pFt").value) * 12 + (+$("pIn").value);
+    else if (t.id === "pFt" || t.id === "pIn") { if ($("pFt").value === "") return; s.heightIn = (+$("pFt").value) * 12 + (+$("pIn").value); }
     else if (t.id === "pAct") s.activity = t.value;
     else if (t.id === "pStart") { n = parseNum(t.value); if (n != null && n >= 70 && n <= 600) s.startLb = n; }
     else if (t.id === "pGoal") { n = parseNum(t.value); s.goalLb = n != null && n >= 70 && n <= 600 ? n : null; }
@@ -1834,6 +1871,247 @@ select.in { padding-right: 30px;
   });
 
   applyTargets();
+
+  // ---------- Cloud backup ----------
+  // Firebase project settings. These are safe to be public: the database rules decide who can read or write.
+  var FIREBASE_CONFIG = window.__FIREBASE_CONFIG_OVERRIDE || null;
+  var SYNC_KEY = "dads-nutrition-sync";
+  var sync = (function () { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch (e) { return {}; } })();
+  var cloud = null, cloudUser = null, cloudState = "loading", cloudError = "", cloudBusy = false, cloudAgain = null;
+  var pushTimer = null, lastPull = 0, signOutArmed = false, authMode = "in";
+  function saveSync() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); } catch (e) {} }
+
+  // Short fingerprint of some data, to tell what changed since the last backup
+  function hashOf(x) {
+    var s = JSON.stringify(x), h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36) + "." + s.length;
+  }
+  function plainCopy(x) { return JSON.parse(JSON.stringify(x)); }
+  function dayData(k) { return { entries: plainCopy(entriesFor(k)), day: state.days[k] ? plainCopy(state.days[k]) : null }; }
+  var EMPTY_DAY = hashOf({ entries: [], day: null });
+  function mainData() {
+    return { settings: plainCopy(state.settings), weights: plainCopy(state.weights).sort(function (a, b) { return a.date < b.date ? -1 : 1; }) };
+  }
+  function allDates() {
+    var o = {};
+    state.entries.forEach(function (e) { o[e.date] = 1; });
+    Object.keys(state.days).forEach(function (k) { o[k] = 1; });
+    Object.keys(sync.base || {}).forEach(function (k) { o[k] = 1; });
+    return Object.keys(o).sort();
+  }
+  function applyDay(k, d) {
+    state.entries = state.entries.filter(function (e) { return e.date !== k; }).concat(d.entries || []);
+    if (d.day) state.days[k] = d.day; else delete state.days[k];
+  }
+  function applyMain(m) {
+    state.settings = Object.assign(defaultSettings(), m.settings || {});
+    state.weights = Array.isArray(m.weights) ? m.weights : [];
+  }
+  // Entries from another phone can share an id with one here: give repeats a new id
+  function fixIds() {
+    var seen = {}, max = state.entries.reduce(function (m, e) { return typeof e.id === "number" ? Math.max(m, e.id) : m; }, 0);
+    state.entries.forEach(function (e) {
+      if (typeof e.id !== "number" || seen[e.id]) e.id = ++max;
+      seen[e.id] = 1;
+    });
+  }
+
+  // Upload only the days (and settings/weights) that changed since the last backup
+  function pushChanges() {
+    var uid = cloudUser.uid, jobs = [];
+    var m = mainData(), mh = hashOf(m);
+    if (mh !== sync.mainBase) jobs.push(function () { return cloud.putMain(uid, m).then(function () { sync.mainBase = mh; saveSync(); }); });
+    allDates().forEach(function (k) {
+      var d = dayData(k), h = hashOf(d), b = (sync.base || {})[k] || EMPTY_DAY;
+      if (h === b) return;
+      jobs.push(function () { return cloud.putDay(uid, k, d).then(function () { sync.base[k] = h; saveSync(); }); });
+    });
+    return jobs.reduce(function (p, job) { return p.then(job); }, Promise.resolve());
+  }
+
+  // First sign-in on this phone: an existing backup wins; with no backup, this phone's data becomes the backup
+  function firstSync() {
+    var uid = cloudUser.uid;
+    return cloud.getMain(uid).then(function (main) {
+      if (!main.exists) {
+        sync = { uid: uid, base: {}, mainBase: null, seen: 0 }; saveSync();
+        return pushChanges();
+      }
+      return cloud.getDays(uid, 0).then(function (days) {
+        if (state.entries.length || state.weights.length) {
+          try { localStorage.setItem(STORE_KEY + "-before-signin", JSON.stringify(state)); } catch (e) {}
+        }
+        state.entries = []; state.days = {};
+        var base = {}, seen = 0;
+        days.forEach(function (r) {
+          var d = { entries: r.entries || [], day: r.day || null };
+          applyDay(r.date, d); base[r.date] = hashOf(d); seen = Math.max(seen, r.updatedAt || 0);
+        });
+        applyMain(main.data);
+        sync = { uid: uid, base: base, mainBase: hashOf(main.data), seen: seen }; saveSync();
+        fixIds(); saveLocalOnly(); refreshAll();
+        return pushChanges();
+      });
+    });
+  }
+
+  // Later syncs: take changes made on another phone, keep changes made here, then upload
+  function pullAndMerge() {
+    var uid = cloudUser.uid, changed = false;
+    sync.base = sync.base || {};
+    return Promise.all([cloud.getMain(uid), cloud.getDays(uid, sync.seen || 0)]).then(function (res) {
+      var main = res[0], days = res[1], seen = sync.seen || 0;
+      days.forEach(function (r) {
+        var d = { entries: r.entries || [], day: r.day || null }, c = hashOf(d);
+        var l = hashOf(dayData(r.date)), b = sync.base[r.date] || EMPTY_DAY;
+        if (c === l) sync.base[r.date] = c;
+        else if (l === b) { applyDay(r.date, d); sync.base[r.date] = c; changed = true; }
+        // else: changed here too, so this phone's version wins and is uploaded below
+        seen = Math.max(seen, r.updatedAt || 0);
+      });
+      if (main.exists) {
+        var c = hashOf(main.data), l = hashOf(mainData());
+        if (c === l) sync.mainBase = c;
+        else if (l === sync.mainBase) { applyMain(main.data); sync.mainBase = c; changed = true; }
+      }
+      sync.seen = seen; saveSync();
+      if (changed) { fixIds(); saveLocalOnly(); refreshAll(); }
+      lastPull = Date.now();
+      return pushChanges();
+    });
+  }
+
+  function saveLocalOnly() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+  function refreshAll() {
+    applyTargets();
+    if (currentTab === "cal") renderCalendar();
+    else if (currentTab === "weight") renderWeight();
+    else if (currentTab === "plan") renderPlan();
+    else render();
+  }
+
+  function cloudRun(kind) {
+    if (!cloudUser) return;
+    if (cloudBusy) { if (kind === "pull" || !cloudAgain) cloudAgain = kind; return; }
+    cloudBusy = true; setCloud("syncing");
+    var job = kind === "pull" ? (sync.uid === cloudUser.uid ? pullAndMerge() : firstSync()) : pushChanges();
+    job.then(function () { sync.last = Date.now(); saveSync(); cloudError = ""; setCloud("ok"); },
+             function (e) { cloudError = cloudErrText(e); setCloud("error"); })
+      .then(function () {
+        cloudBusy = false;
+        if (cloudAgain && cloudUser) { var k = cloudAgain; cloudAgain = null; cloudRun(k); }
+      });
+  }
+  function cloudAfterSave() {
+    if (!cloudUser) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () { cloudRun("push"); }, 1500);
+  }
+  function cloudErrText(e) {
+    var c = String((e && e.code) || "");
+    if (/invalid-credential|wrong-password|user-not-found|invalid-email|missing-password/.test(c)) return "Email or password is wrong.";
+    if (/network|unavailable|deadline/.test(c) || (typeof navigator !== "undefined" && navigator.onLine === false)) return "No internet right now. It will back up when the phone is online.";
+    if (/too-many-requests/.test(c)) return "Too many tries. Wait a few minutes and try again.";
+    if (/email-already-in-use/.test(c)) return "That email already has an account. Tap Sign in instead.";
+    if (/weak-password/.test(c)) return "Use a password with at least 6 characters.";
+    if (/operation-not-allowed/.test(c)) return "Email sign-in isn't turned on in Firebase yet.";
+    if (/permission-denied/.test(c)) return "The cloud refused the save. Check the database rules.";
+    return "The backup didn't go through. It will try again.";
+  }
+
+  function timeText(ms) {
+    if (!ms) return "";
+    var d = new Date(ms), t = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return dayKey(d) === dayKey() ? "today at " + t : shortDate(dayKey(d)) + " at " + t;
+  }
+  function setCloud(st) { cloudState = st; renderCloudNote(); if (currentTab === "plan") renderBackup(); }
+  function renderCloudNote() {
+    var el = $("cloudNote"); if (!el) return;
+    el.textContent = cloudState === "nocfg" ? ""
+      : cloudState === "out" ? "Cloud backup is off. Sign in on the Plan tab."
+      : cloudState === "error" ? "Not backed up yet. It will try again."
+      : cloudState === "ok" ? "Backed up " + timeText(sync.last) + "."
+      : cloudState === "syncing" ? "Backing up…" : "";
+  }
+  function renderBackup() {
+    var box = $("backupBody"); if (!box) return;
+    var h = '<div class="section-h"><h2>Backup</h2><span>' + (cloudUser ? "On" : cloudState === "nocfg" ? "Not set up" : "Off") + '</span></div><section class="card plan-card">';
+    if (cloudState === "nocfg") {
+      h += '<p class="note">Cloud backup isn\'t set up yet. Everything is saved on this phone only.</p>';
+    } else if (!cloudUser) {
+      h += '<p class="note" style="font-size:14px;color:var(--fg)">Sign in to back up your food log, weigh-ins and plan, so nothing is lost if your phone breaks or changes.</p>' +
+        '<div><label class="lab" for="bEmail">Email</label><input class="in" id="bEmail" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false"></div>' +
+        '<div><label class="lab" for="bPw">Password</label><input class="in" id="bPw" type="password" autocomplete="' + (authMode === "new" ? "new-password" : "current-password") + '"' + (authMode === "new" ? ' placeholder="At least 6 characters"' : '') + '></div>' +
+        (cloudError ? '<p class="form-err" role="alert">' + esc(cloudError) + '</p>' : '') +
+        '<button class="primary" type="button" id="bSignIn"' + (cloudState === "signing" || cloudState === "loading" ? ' disabled' : '') + '>' +
+          (cloudState === "signing" ? "One moment…" : authMode === "new" ? "Create account" : "Sign in") + '</button>' +
+        '<div class="btn-row"><button class="link-btn" type="button" id="bMode">' + (authMode === "new" ? "Have an account? Sign in" : "New here? Create an account") + '</button>' +
+        (authMode === "new" ? '' : '<button class="link-btn" type="button" id="bForgot">Forgot password?</button>') + '</div>' +
+        '<p class="note">Signing in on a new phone loads your backup and replaces anything logged on that phone.</p>';
+    } else {
+      var dot = cloudState === "ok" ? "ok" : cloudState === "error" ? "err" : "busy";
+      var title = cloudState === "ok" ? "Backed up" : cloudState === "error" ? "Not backed up yet" : "Backing up…";
+      var sub = cloudState === "error" ? cloudError : sync.last ? "Last backup " + timeText(sync.last) : "Saving to the cloud";
+      h += '<div class="backup-row"><span class="bdot ' + dot + '" aria-hidden="true"></span><div><b>' + title + '</b><small>' + esc(sub) + '</small></div></div>' +
+        '<p class="note">Signed in as ' + esc(cloudUser.email) + '. Every change backs up on its own.</p>' +
+        '<div class="btn-row"><button class="ghost-btn" type="button" id="bNow"' + (cloudState === "syncing" ? " disabled" : "") + '>Back up now</button>' +
+        '<button class="ghost-btn" type="button" id="bOut">' + (signOutArmed ? "Tap again to sign out" : "Sign out") + '</button></div>';
+    }
+    box.innerHTML = h + '</section>';
+  }
+  $("backupBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    if (b.id === "bSignIn") {
+      var email = $("bEmail").value.trim(), pw = $("bPw").value;
+      if (!email || !pw) { cloudError = "Type the email and password."; renderBackup(); return; }
+      cloudError = ""; cloudState = "signing"; renderBackup();
+      (authMode === "new" ? cloud.createAccount(email, pw) : cloud.signIn(email, pw)).catch(function (e) {
+        cloudError = cloudErrText(e); cloudState = "out"; renderBackup();
+        var pwBox = $("bPw"), emBox = $("bEmail"); if (emBox) emBox.value = email; if (pwBox) pwBox.value = "";
+      });
+    } else if (b.id === "bMode") {
+      var keep = $("bEmail").value;
+      authMode = authMode === "new" ? "in" : "new"; cloudError = ""; renderBackup(); $("bEmail").value = keep;
+    } else if (b.id === "bForgot") {
+      var em = ($("bEmail").value || "").trim();
+      if (!em) { cloudError = "Type the email first, then tap Forgot password."; renderBackup(); return; }
+      cloud.resetPassword(em).then(function () { toast("Password reset email sent"); }, function () { toast("Couldn't send the email. Check the address."); });
+    } else if (b.id === "bNow") {
+      cloudRun("pull");
+    } else if (b.id === "bOut") {
+      if (!signOutArmed) { signOutArmed = true; renderBackup(); setTimeout(function () { signOutArmed = false; if (currentTab === "plan") renderBackup(); }, 4000); return; }
+      signOutArmed = false;
+      cloud.signOut().then(function () { toast("Signed out. This phone keeps its data."); });
+    }
+  });
+
+  function startCloud() {
+    if (!FIREBASE_CONFIG) { cloudState = "nocfg"; renderCloudNote(); return; }
+    function go() {
+      try { cloud = window.CloudSDK.start(FIREBASE_CONFIG); }
+      catch (e) { cloudState = "nocfg"; renderCloudNote(); return; }
+      cloud.onUser(function (u) {
+        var was = cloudUser && cloudUser.uid;
+        cloudUser = u;
+        if (!u) { cloudBusy = false; cloudAgain = null; setCloud("out"); return; }
+        if (was !== u.uid) cloudRun("pull");
+      });
+    }
+    if (window.CloudSDK) go();
+    else {
+      var sc = document.createElement("script");
+      sc.src = "cloud.js"; sc.onload = go;
+      sc.onerror = function () { cloudState = "error"; cloudError = "Couldn't load the backup code. Check the internet."; renderCloudNote(); };
+      document.head.appendChild(sc);
+    }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && cloudUser && Date.now() - lastPull > 60000) cloudRun("pull");
+  });
+  window.addEventListener("online", function () { if (cloudUser) cloudRun("push"); });
+  startCloud();
+  window.__nutritionTest.cloudSync = function () { return sync; };
 
   // New day while the app stays open
   var lastDay = dayKey();

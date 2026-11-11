@@ -1,7 +1,7 @@
 // Keeps the app working offline. Bump VERSION whenever the app files change.
-const VERSION = "v9";
+const VERSION = "v10";
 const CACHE = "dads-nutrition-" + VERSION;
-const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
+const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "cloud.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
