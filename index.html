@@ -644,7 +644,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 27</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 28</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -734,8 +734,10 @@ select.in { padding-right: 30px;
   var TARGETS = Object.assign({}, SAMPLE_TARGETS);
   // Under this on a completed day = ate too little (purple). Common minimums: 1,500 for men, 1,200 for women.
   function floorKcal() { return state && state.settings && state.settings.sex === "female" ? 1200 : 1500; }
-  var OVER_YELLOW = 250;   // up to this many kcal over target = yellow, beyond = red
-  var CUSHION = 150;       // within this many kcal of target still counts as on target (Caio's choice)
+  // Within the cushion of target = on target (green). The next 100 kcal = yellow, beyond = red.
+  // Losing/maintaining is stricter (150) than bulking (250). Caio's choice, Nov 10.
+  function cushion() { return surplusGoal() ? 250 : 150; }
+  var YELLOW_BAND = 100;
   var API_KEY = "mW7hWGzTbNFGcDbCPKpmcfgq6NFwfgTRdcnzqJqT";
   var API = "https://api.nal.usda.gov/fdc/v1";
   var STORE_KEY = "dads-nutrition-v2";
@@ -969,23 +971,25 @@ select.in { padding-right: 30px;
     STATUS.mid.label = up ? "A little under" : "A little over";
     STATUS.bad.label = up ? "Under target" : "Over target";
     if ($("lgGood")) {
-      $("lgGood").textContent = up ? "Over target or up to 150 under" : "Under target or up to 150 over";
-      $("lgMid").textContent = up ? "150 to 250 under" : "150 to 250 over";
-      $("lgBad").textContent = up ? "More than 250 under" : "More than 250 over";
+      var c = cushion(), y = c + YELLOW_BAND;
+      $("lgGood").textContent = up ? "Over target or up to " + c + " under" : "Under target or up to " + c + " over";
+      $("lgMid").textContent = up ? c + " to " + y + " under" : c + " to " + y + " over";
+      $("lgBad").textContent = up ? "More than " + y + " under" : "More than " + y + " over";
     }
   }
   function statusFor(kcal, target, complete, hasEntries) {
     if (!complete) return hasEntries ? "open" : "none";
     kcal = Math.round(kcal);
     // Purple only when far below both the safe minimum and the person's own target
-    if (kcal < floorKcal() && kcal < target - CUSHION) return "low";
+    var c = cushion();
+    if (kcal < floorKcal() && kcal < target - c) return "low";
     if (surplusGoal()) {
-      if (kcal >= target - CUSHION) return "good";
-      if (kcal >= target - OVER_YELLOW) return "mid";
+      if (kcal >= target - c) return "good";
+      if (kcal >= target - c - YELLOW_BAND) return "mid";
       return "bad";
     }
-    if (kcal <= target + CUSHION) return "good";
-    if (kcal <= target + OVER_YELLOW) return "mid";
+    if (kcal <= target + c) return "good";
+    if (kcal <= target + c + YELLOW_BAND) return "mid";
     return "bad";
   }
   function dayInfo(k) {
