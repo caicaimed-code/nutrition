@@ -525,7 +525,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 11</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 12</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -691,6 +691,33 @@ select.in { padding-right: 30px;
     KEEP.forEach(function (id) { if (typeof map[id] === "number") out[id] = Math.round(map[id] * 1000) / 1000; });
     return out;
   }
+  // Volume units: how many ml in one of them. Only used to find how much a liquid food weighs per ml.
+  var VOLUME_UNITS = [
+    [/\bfl\.?\s*oz\b|fluid ounce/i, 29.5735],
+    [/\b(ml|milliliter|millilitre)s?\b/i, 1],
+    [/\b(liter|litre)s?\b/i, 1000],
+    [/\bcup\b/i, 236.588], [/\btbsp\b|tablespoon/i, 14.7868], [/\btsp\b|teaspoon/i, 4.92892],
+    [/\bpint\b/i, 473.176], [/\bquart\b/i, 946.353]
+  ];
+  // Grams per ml, from a portion like "1 fl oz = 30.5 g". Needs a fluid-measure portion (fl oz, ml, liter)
+  // so solids measured by the cup (sugar, rice, chopped fruit) never get an ml option. Returns null if unknown.
+  function densityFromPortions(portions) {
+    var found = null;
+    (portions || []).forEach(function (p) {
+      if (found || !p || !(p.gramWeight > 0)) return;
+      var text = [p.portionDescription, p.measureUnit && p.measureUnit.name, p.modifier].filter(Boolean).join(" ");
+      if (/not specified|undetermined/i.test(text)) return;
+      var mlPer = null;
+      for (var i = 0; i < 3; i++) if (VOLUME_UNITS[i][0].test(text)) { mlPer = VOLUME_UNITS[i][1]; break; }
+      if (mlPer == null) return;
+      // Skip portions like "can (12 fl oz)" or "cup, chopped": only plain fluid amounts
+      var amount = p.amount > 0 ? p.amount : (parseFloat(text) > 0 ? parseFloat(text) : 1);
+      if (/\b(can|bottle|pouch|packet|container|carton|box|serving|piece|slice|chopped|sliced|diced|pieces|packed|shredded)\b/i.test(text)) return;
+      var d = p.gramWeight / (amount * mlPer);
+      if (d > 0.3 && d < 2) found = d;
+    });
+    return found;
+  }
   function buildUnits(food) {
     var units = [], seen = {};
     function add(label, grams) {
@@ -718,7 +745,11 @@ select.in { padding-right: 30px;
       if (m && m.gramWeight > 0 && m.disseminationText && !/not specified/i.test(m.disseminationText)) add(m.disseminationText + " (" + r1(m.gramWeight) + " g)", m.gramWeight);
     });
     if (liquid) { add("ml", 1); add("fl oz", 29.5735); }
-    else { add("g", 1); add("oz", 28.3495); }
+    else {
+      add("g", 1); add("oz", 28.3495);
+      var dens = densityFromPortions(food.foodPortions);
+      if (dens) { add("ml", dens); add("fl oz", 29.5735 * dens); }
+    }
     return units;
   }
   function isRawUnit(label) { return label === "g" || label === "oz" || label === "ml" || label === "fl oz"; }
@@ -927,7 +958,15 @@ select.in { padding-right: 30px;
     var t = ev.target;
     if (!t.dataset || !t.dataset.time) return;
     var e = findEntry(+t.dataset.time);
-    if (e && validTime(t.value)) { e.time = t.value; save(); render(); }
+    if (e && validTime(t.value)) { e.time = t.value; save(); mealsDirty = true; }
+  });
+  var mealsDirty = false;
+  $("meals").addEventListener("focusout", function () {
+    setTimeout(function () {
+      var a = document.activeElement;
+      if (!mealsDirty || (a && $("meals").contains(a) && a.tagName === "INPUT")) return;
+      mealsDirty = false; render();
+    }, 0);
   });
 
   $("macros").addEventListener("click", function (ev) {
@@ -980,20 +1019,22 @@ select.in { padding-right: 30px;
         html += '<div class="group-label">Recent</div><ul class="food-list">' +
           rec.map(function (e) { return foodRow('data-recent="' + e.id + '"', e.name, servingText(e) + (e.brand ? " · " + e.brand : ""), entryValue(e, "kcal"), "kcal"); }).join("") + '</ul>';
       } else {
-        html += '<div class="state"><strong>Search any food</strong>Try "banana", "chicken breast" or a brand like "Fage yogurt".</div>';
+        html += '<div class="state"><strong>Search everyday foods</strong>Try "banana", "chicken breast" or "oats". For packaged foods, scan the barcode.</div>';
       }
     } else if (!results || results.query !== q || results.loading) {
       html += '<div class="state"><div class="spinner"></div>Searching…</div>';
     } else if (results.error) {
       html += '<div class="state"><strong>' + esc(results.error.title) + '</strong>' + esc(results.error.text) + '</div>';
-    } else if (!results.generic.length && !results.branded.length) {
-      html += '<div class="state"><strong>No foods found</strong>Try fewer words or a different spelling, or add it as a custom food.</div>';
     } else {
       if (results.generic.length) {
-        html += '<div class="group-label">Common foods</div><ul class="food-list">' + results.generic.map(function (f, i) {
+        var shown = results.more ? 14 : 6;
+        html += '<div class="group-label">Foods</div><ul class="food-list">' + results.generic.slice(0, shown).map(function (f, i) {
           var p = per100FromMap(mapFromSearch(f));
           return foodRow('data-pick="g' + i + '"', niceName(f.description), "Per 100 g", p.kcal, "kcal");
         }).join("") + '</ul>';
+        if (results.generic.length > 6 && !results.more) html += '<button class="more-btn" type="button" data-more="1">Show more foods</button>';
+      } else if (!results.branded.length && !results.packagedLoading) {
+        html += '<div class="state"><strong>No everyday foods found</strong>Try fewer words or a different spelling.</div>';
       }
       if (results.branded.length) {
         html += '<div class="group-label">Brands</div><ul class="food-list">' + results.branded.map(function (f, i) {
@@ -1004,10 +1045,47 @@ select.in { padding-right: 30px;
           var kcal = p.kcal == null ? null : (isServing ? p.kcal * f.servingSize / 100 : p.kcal);
           return foodRow('data-pick="b' + i + '"', niceName(f.description), (brand ? brand + " · " : "") + (isServing ? u.label : "per 100 g"), kcal, isServing ? "per serving" : "per 100 g");
         }).join("") + '</ul>';
+      } else if (results.packaged) {
+        html += '<div class="state"><strong>No packaged foods found</strong>Try the barcode scanner or add it as a custom food.</div>';
       }
+      if (results.packagedLoading) html += '<div class="state"><div class="spinner"></div>Searching packaged foods…</div>';
+      else if (!results.packaged) html += '<button class="more-btn" type="button" data-packaged="1">' + (results.packagedError ? "Couldn't load. Try again" : "Search packaged foods") + '</button>';
     }
     $("sheetBody").innerHTML = html;
   }
+
+  // Everyday food ranking. The database's own order puts "banana powder" above "bananas, raw", so we re-rank.
+  var COOK_WORDS = /\b(cooked|grilled|baked|roasted|fried|boiled|steamed|broiled|scrambled|poached)\b/;
+  var PROCESSED_WORDS = ["dehydrated", "powder", "babyfood", "baby food", "imitation", "substitute", "flavored", "dry mix", "restaurant", "fast food", "infant formula", "syrup", "gravy", "breaded", "battered", "lunchmeat", "luncheon", "nugget"];
+  function singularWord(w) { return w.length > 3 ? w.replace(/ies$/, "y").replace(/([^s])s$/, "$1") : w; }
+  function nameSegments(desc) {
+    return String(desc || "").toLowerCase().replace(/[^a-z0-9,% ]/g, " ").split(",").map(function (seg) {
+      return seg.trim().split(/\s+/).filter(Boolean).map(singularWord).join(" ");
+    }).filter(Boolean);
+  }
+  function foodState(flat) { return /\braw\b/.test(flat) ? "raw" : COOK_WORDS.test(flat) ? "cooked" : "other"; }
+  function rankFoods(foods, query) {
+    var qFlat = nameSegments(query).join(" "), qTokens = qFlat.split(" ").filter(Boolean);
+    var qCooks = COOK_WORDS.test(qFlat), best = {};
+    foods.forEach(function (f, i) {
+      var segs = nameSegments(f.description), flat = segs.join(" "), first = segs[0] || "";
+      var score = 0;
+      if (qTokens.every(function (t) { return flat.indexOf(t) >= 0; })) score += 40;
+      if (qTokens.every(function (t) { return segs.slice(0, 3).join(" ").indexOf(t) >= 0; })) score += 30;
+      if (first === qFlat) score += 60; else if (first.indexOf(qFlat) === 0) score += 35;
+      if (qCooks) { if (COOK_WORDS.test(flat)) score += 20; } else if (/\braw\b/.test(flat)) score += 20;
+      PROCESSED_WORDS.forEach(function (w) { if (flat.indexOf(w) >= 0 && qFlat.indexOf(w) < 0) score -= 25; });
+      score -= Math.max(0, segs.length - 3) * 4;
+      score -= Math.max(0, flat.length - 30) * 0.15;
+      score += f.dataType === "Foundation" ? 12 : f.dataType === "SR Legacy" ? 8 : 0;
+      score -= i * 0.01; // keep the database's order for ties
+      // One result per food and state (raw, cooked, other): hides "Milk, whole" vs "Milk, whole, 3.25% milkfat, ..."
+      var key = segs.slice(0, 2).join("|") + "|" + foodState(flat);
+      if (!best[key] || score > best[key].score) best[key] = { f: f, score: score };
+    });
+    return Object.keys(best).map(function (k) { return best[k]; }).sort(function (a, b) { return b.score - a.score; }).map(function (x) { return x.f; });
+  }
+  window.__nutritionTest.rankFoods = rankFoods;
 
   function apiError(status) {
     if (status === 429) return { title: "Too many searches right now", text: "The food database limits searches per hour. Try again in a little while." };
@@ -1031,30 +1109,33 @@ select.in { padding-right: 30px;
     if (searchCtrl) searchCtrl.abort();
     searchCtrl = typeof AbortController !== "undefined" ? new AbortController() : null;
     var signal = searchCtrl && searchCtrl.signal;
-    results = { query: q, loading: true, generic: [], branded: [] };
+    results = { query: q, loading: true, generic: [], branded: [], more: false, packaged: false };
     renderSearchBody();
     if (!navigator.onLine) {
       results = { query: q, generic: [], branded: [], error: { title: "No internet connection", text: "Food search needs internet. Recent foods still work offline." } };
       renderSearchBody(); return;
     }
-    Promise.allSettled([
-      fetchJSON(searchUrl(q, "Foundation,SR Legacy,Survey (FNDDS)", 12), signal),
-      fetchJSON(searchUrl(q, "Branded", 15), signal)
-    ]).then(function (out) {
+    fetchJSON(searchUrl(q, "Foundation,SR Legacy,Survey (FNDDS)", 30), signal).then(function (data) {
       if ($("search").value.trim() !== q) return;
-      var g = out[0], b = out[1];
-      if (g.status === "rejected" && b.status === "rejected") {
-        if (g.reason && g.reason.name === "AbortError") return;
-        var st = (g.reason && g.reason.status) || (b.reason && b.reason.status);
-        results = { query: q, generic: [], branded: [], error: st ? apiError(st) : { title: "Couldn't reach the food database", text: "Check your connection and try again." } };
-      } else {
-        results = {
-          query: q,
-          generic: g.status === "fulfilled" ? (g.value.foods || []) : [],
-          branded: b.status === "fulfilled" ? (b.value.foods || []) : []
-        };
-      }
+      results = { query: q, generic: rankFoods(data.foods || [], q), branded: [], more: false, packaged: false };
       renderSearchBody();
+    }, function (err) {
+      if (err && err.name === "AbortError") return;
+      if ($("search").value.trim() !== q) return;
+      results = { query: q, generic: [], branded: [], error: err && err.status ? apiError(err.status) : { title: "Couldn't reach the food database", text: "Check your connection and try again." } };
+      renderSearchBody();
+    });
+  }
+  // Packaged foods are searched only when asked (scanning the barcode is the quick way)
+  function runPackagedSearch() {
+    var q = results && results.query; if (!q) return;
+    results.packagedLoading = true; renderSearchBody();
+    fetchJSON(searchUrl(q, "Branded", 15)).then(function (data) {
+      if (!results || results.query !== q) return;
+      results.branded = data.foods || []; results.packaged = true; results.packagedLoading = false; renderSearchBody();
+    }, function () {
+      if (!results || results.query !== q) return;
+      results.packagedLoading = false; results.packagedError = true; renderSearchBody();
     });
   }
 
@@ -1062,7 +1143,7 @@ select.in { padding-right: 30px;
     clearTimeout(searchTimer);
     var q = $("search").value.trim();
     if (q.length < 2) { results = null; renderSearchBody(); return; }
-    results = { query: q, loading: true, generic: [], branded: [] };
+    results = { query: q, loading: true, generic: [], branded: [], more: false, packaged: false };
     renderSearchBody();
     searchTimer = setTimeout(function () { runSearch(q); }, 350);
   });
@@ -1131,9 +1212,10 @@ select.in { padding-right: 30px;
   function openDetailFromEntry(e) {
     var units = [{ label: e.unitLabel, grams: e.unitGrams }];
     if (!e.custom) {
-      var liquid = /\bml\b|fl oz/.test(e.unitLabel);
-      (liquid ? [{ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 }] : [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }])
-        .forEach(function (u) { if (u.label !== e.unitLabel) units.push(u); });
+      var perMl = e.unitLabel === "ml" ? e.unitGrams : e.unitLabel === "fl oz" ? e.unitGrams / 29.5735 : null;
+      var alts = [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }];
+      if (perMl) alts = [{ label: "ml", grams: perMl }, { label: "fl oz", grams: 29.5735 * perMl }].concat(alts);
+      alts.forEach(function (u) { if (u.label !== e.unitLabel) units.push(u); });
     }
     current = {
       fdcId: e.fdcId, name: e.name, brand: e.brand || "", dataType: e.dataType || "", custom: !!e.custom,
@@ -1195,10 +1277,15 @@ select.in { padding-right: 30px;
     $("addBtn").addEventListener("click", addCurrent);
   }
 
+  function amountText(u, qty, grams) {
+    if (u.label === "ml") return fmtG(qty) + " ml";
+    if (u.label === "fl oz") return fmtG(qty * 29.5735) + " ml";
+    return fmtG(grams) + " g";
+  }
   function nutHtml(kcal, grams) {
     var p = current.per100;
     return '<div class="nut-kcal"><div class="v num">' + (kcal == null ? "–" : fmt(kcal)) + '<small>kcal</small></div>' +
-      '<div class="est">' + (p.est ? "Calories estimated from macros" : current.custom ? "" : (grams ? fmtG(grams) + (/\bml\b|fl oz/.test(current.units[current.unitIndex].label) ? " ml" : " g") : "")) + '</div></div>' +
+      '<div class="est">' + (p.est ? "Calories estimated from macros" : current.custom ? "" : (grams ? amountText(current.units[current.unitIndex], current.qty, grams) : "")) + '</div></div>' +
       '<div class="nut-grid">' +
         nutCell("Protein", "var(--protein)", amountFor(p, grams, "protein")) +
         nutCell("Carbs", "var(--carbs)", amountFor(p, grams, "carbs")) +
@@ -1417,8 +1504,10 @@ select.in { padding-right: 30px;
     sheetKind = b.dataset.kind; renderKind();
   });
   $("sheetBody").addEventListener("click", function (ev) {
-    var b = ev.target.closest("[data-pick],[data-recent],[data-custom]"); if (!b) return;
+    var b = ev.target.closest("[data-pick],[data-recent],[data-custom],[data-more],[data-packaged]"); if (!b) return;
     if (b.dataset.custom) { $("search").blur(); openCustom(); return; }
+    if (b.dataset.more) { results.more = true; renderSearchBody(); return; }
+    if (b.dataset.packaged) { runPackagedSearch(); return; }
     if (b.dataset.recent) {
       var e = state.entries.find(function (x) { return x.id === +b.dataset.recent; });
       if (e) openDetailFromEntry(e);
@@ -1785,6 +1874,7 @@ select.in { padding-right: 30px;
   window.__nutritionTest.calc = calc; window.__nutritionTest.macroTargets = macroTargets; window.__nutritionTest.ageOn = ageOn;
 
   function renderPlan() {
+    planDirty = false;
     var s = state.settings, w = currentWeight(), c = calc(s, w), hasWeigh = state.weights.length > 0;
     var missing = statsMissing(s, w);
     var top = '<section class="card plan-card">' +
@@ -1825,7 +1915,7 @@ select.in { padding-right: 30px;
         '<div class="full"><span class="lab">Sex</span><div class="seg" id="sexSeg" role="group" aria-label="Sex">' +
           '<button type="button" data-sex="male" aria-pressed="' + (s.sex === "male") + '">Male</button><button type="button" data-sex="female" aria-pressed="' + (s.sex === "female") + '">Female</button></div></div>' +
         '<div><label class="lab" for="pBirth">Birth date</label><input class="in" id="pBirth" type="date" value="' + esc(s.birth || "") + '" max="' + dayKey() + '"></div>' +
-        '<div><span class="lab">Age</span><div class="in num" style="display:flex;align-items:center;background:none;border-color:transparent;padding:0">' + (s.birth ? ageOn(s.birth) + ' years' : '–') + '</div></div>' +
+        '<div><span class="lab">Age</span><div class="in num" id="pAge" style="display:flex;align-items:center;background:none;border-color:transparent;padding:0">' + (s.birth ? ageOn(s.birth) + ' years' : '–') + '</div></div>' +
         '<div class="full"><span class="lab">Height</span><div class="ft-in">' +
           '<select class="in" id="pFt" aria-label="Feet">' + (ft == null ? '<option value="" selected>– ft</option>' : '') + [4, 5, 6, 7].map(function (f) { return '<option value="' + f + '"' + (f === ft ? ' selected' : '') + '>' + f + ' ft</option>'; }).join("") + '</select>' +
           '<select class="in" id="pIn" aria-label="Inches">' + Array.from({ length: 12 }, function (_, i) { return '<option value="' + i + '"' + (i === inch ? ' selected' : '') + '>' + i + ' in</option>'; }).join("") + '</select>' +
@@ -1867,7 +1957,23 @@ select.in { padding-right: 30px;
     else if (t.id === "pStart") { n = parseNum(t.value); if (n != null && n >= 70 && n <= 600) s.startLb = n; }
     else if (t.id === "pGoal") { n = parseNum(t.value); s.goalLb = n != null && n >= 70 && n <= 600 ? n : null; }
     else return;
-    planChanged();
+    // Save now, but redraw only after the field is released, so an open date or wheel picker isn't destroyed
+    save(); applyTargets();
+    if (t.id === "pBirth" && $("pAge")) $("pAge").textContent = ageOn(s.birth) + " years";
+    planDirty = true;
+  });
+  var planDirty = false;
+  function planSettle() {
+    setTimeout(function () {
+      var a = document.activeElement;
+      if (!planDirty || currentTab !== "plan") return;
+      if (a && $("planBody").contains(a) && /^(INPUT|SELECT)$/.test(a.tagName)) return; // still editing another field
+      renderPlan();
+    }, 0);
+  }
+  $("planBody").addEventListener("focusout", planSettle);
+  $("planBody").addEventListener("click", function (ev) {
+    if (planDirty && !ev.target.closest("input, select, label, button")) planSettle();
   });
 
   applyTargets();
