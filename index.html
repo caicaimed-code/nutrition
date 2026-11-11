@@ -622,7 +622,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 23</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 24</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -966,7 +966,7 @@ select.in { padding-right: 30px;
     var list = entriesFor(k);
     var t = totals(list);
     var d = state.days[k] || {};
-    var target = d.target || TARGETS.kcal;
+    var target = TARGETS.kcal; // always graded against today's plan (Caio's choice)
     return { key: k, list: list, totals: t, kcal: t.kcal, target: target, complete: !!d.complete, status: statusFor(t.kcal, target, !!d.complete, list.length > 0) };
   }
   window.__nutritionTest.statusFor = statusFor;
@@ -2548,8 +2548,10 @@ select.in { padding-right: 30px;
       return { pace: p, kcal: Math.round(k / 10) * 10 };
     }) };
   }
-  function macroTargets(kcal, weightLb) {
-    var protein = Math.round(0.8 * weightLb);
+  // Protein per pound: 0.8 (standard) or 1.0 ("Max muscle", top of the range research supports)
+  function proteinPerLb(s) { return s && s.proteinPerLb === 1 ? 1 : 0.8; }
+  function macroTargets(kcal, weightLb, perLb) {
+    var protein = Math.round((perLb || 0.8) * weightLb);
     var fat = Math.round(kcal * 0.30 / 9);
     var fiber = Math.round(kcal / 1000 * 14);
     var carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
@@ -2561,7 +2563,7 @@ select.in { padding-right: 30px;
     var hit = c && chosenPace(c, s);
     syncStatusLabels();
     if (!hit) { Object.assign(TARGETS, SAMPLE_TARGETS); return; }
-    Object.assign(TARGETS, macroTargets(hit.kcal, w));
+    Object.assign(TARGETS, macroTargets(hit.kcal, w, proteinPerLb(s)));
   }
   function chosenPace(c, s) {
     var g = goalOf(s);
@@ -2608,11 +2610,18 @@ select.in { padding-right: 30px;
       }).join("") + '</section>';
     }
     if (c) {
-      var mt = hit ? TARGETS : macroTargets(Math.round(c.maint / 10) * 10, w);
+      var mt = hit ? TARGETS : macroTargets(Math.round(c.maint / 10) * 10, w, proteinPerLb(s));
+      var per = proteinPerLb(s);
       macros = '<section class="card plan-card"><p class="note" style="margin:0">' + (hit ? "In use for your goal." : "Preview at maintenance. Pick a goal to use your own.") + '</p><div class="macro-targets">' + MACROS.map(function (m) {
           return '<div><div class="v num">' + fmt(mt[m.key]) + '<span style="font-size:12px"> g</span></div><div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div></div>';
         }).join("") + '</div>' +
-        '<p class="note">Protein is 0.8 g per pound of body weight, inside the range research supports for keeping and building muscle. Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest.</p></section>';
+        '<span class="lab" style="margin-top:6px">Protein</span><div class="seg" role="group" aria-label="Protein level">' +
+          '<button type="button" data-prot="0.8" aria-pressed="' + (per === 0.8) + '">Standard · 0.8 g/lb</button>' +
+          '<button type="button" data-prot="1" aria-pressed="' + (per === 1) + '">Max muscle · 1 g/lb</button></div>' +
+        '<p class="note">' + (per === 1
+          ? 'Protein is 1 g per pound of body weight, the top of the range research supports. Most people get nearly all the muscle benefit by about 0.7 g per pound; going to 1 g covers the people who need more.'
+          : 'Protein is 0.8 g per pound of body weight. Research finds most of the muscle benefit by about 0.7 g per pound; pick Max muscle to go to the top of the supported range.') +
+        ' Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest, so more protein means fewer carbs.</p></section>';
     }
 
     var ft = s.heightIn ? Math.floor(s.heightIn / 12) : null, inch = s.heightIn ? s.heightIn % 12 : 0;
@@ -2705,6 +2714,10 @@ select.in { padding-right: 30px;
       state.settings.pace = b.dataset.pace; planChanged();
       toast("Daily target set to " + fmt(TARGETS.kcal) + " kcal");
     } else if (b.dataset.sex) { state.settings.sex = b.dataset.sex; planChanged(); }
+    else if (b.dataset.prot) {
+      state.settings.proteinPerLb = +b.dataset.prot; planChanged();
+      toast("Protein target set to " + fmt(TARGETS.protein) + " g");
+    }
   });
   $("planBody").addEventListener("change", function (ev) {
     var t = ev.target, s = state.settings, n;
