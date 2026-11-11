@@ -211,6 +211,22 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .form, .detail { min-width: 0; max-width: 100%; }
 .more-btn { align-self: flex-start; color: var(--muted); font-weight: 600; font-size: 14px; padding: 4px 0; }
+.more-btn.big { display: block; width: 100%; height: 50px; margin: 10px 0 4px; border-radius: 14px; background: var(--track); color: var(--fg); font-size: 16px; font-weight: 600; text-align: center; padding: 0; }
+.foot-alt { display: block; width: 100%; margin-top: 8px; text-align: center; }
+.tray-bar { background: var(--track); border-radius: 14px; padding: 12px; border-bottom: 0; margin: 6px 0 8px; }
+.tray-list { list-style: none; margin: 0; padding: 0; }
+.tray-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.tray-item .t, .sub-item .t { flex: 1; min-width: 0; }
+.tray-item .n { font-weight: 500; overflow-wrap: anywhere; }
+.tray-item .m { color: var(--muted); font-size: 13px; }
+.tray-item .k { font-weight: 600; flex: none; }
+.tray-x { width: 34px; height: 34px; border-radius: 50%; background: var(--track); color: var(--muted); display: grid; place-items: center; font-size: 14px; flex: none; }
+.sub-items { list-style: none; margin: 0; padding: 0; width: 100%; }
+.sub-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.sub-item .n { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.sub-item .s { font-size: 12.5px; color: var(--muted); }
+.sub-item .stepper button { width: 32px; height: 32px; font-size: 18px; }
+.sub-item .stepper .q { min-width: 40px; }
 .check { font-size: 13px; color: var(--muted); }
 .check.warn { color: var(--warn); }
 .time-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }
@@ -604,7 +620,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 21</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 22</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -994,13 +1010,15 @@ select.in { padding-right: 30px;
         '</button>';
     }).join("");
 
-    var meals = list.filter(function (e) { return e.kind !== "snack"; }).length;
-    var snacks = list.length - meals;
+    var units = unitsOf(list);
+    var meals = units.filter(function (u) { return u.items[0].kind !== "snack"; }).length;
+    var snacks = units.length - meals;
     $("itemCount").textContent = list.length ? [meals ? meals + (meals === 1 ? " meal" : " meals") : "", snacks ? snacks + (snacks === 1 ? " snack" : " snacks") : ""].filter(Boolean).join(" · ") : "";
 
-    var sorted = list.slice().sort(byTime);
-    $("meals").innerHTML = '<section class="card log-card">' + (sorted.length
-      ? '<ul class="items">' + sorted.map(function (e) {
+    $("meals").innerHTML = '<section class="card log-card">' + (units.length
+      ? '<ul class="items">' + units.map(function (u) {
+          if (u.gid) return groupHtml(u);
+          var e = u.items[0];
           var open = expanded === e.id;
           var kind = e.kind === "snack" ? "snack" : "meal";
           return '<li class="item">' +
@@ -1030,6 +1048,50 @@ select.in { padding-right: 30px;
       : '<div class="log-empty"><strong>Nothing logged ' + (selectedDate === dayKey() ? 'today' : 'this day') + '</strong>Tap Log food to add a meal or a snack.</div>') + '</section>';
   }
 
+  // Foods logged together share e.meal; show them as one card (one item alone shows as before)
+  function unitsOf(list) {
+    var out = [], groups = {};
+    list.slice().sort(byTime).forEach(function (e) {
+      if (e.meal) {
+        var g = groups[e.meal];
+        if (!g) { g = groups[e.meal] = { gid: e.meal, items: [] }; out.push(g); }
+        g.items.push(e);
+      } else out.push({ items: [e] });
+    });
+    return out.map(function (u) { return u.gid && u.items.length < 2 ? { items: u.items } : u; });
+  }
+  function groupName(u) { var f = u.items.find(function (x) { return x.mealName; }); return f ? f.mealName : autoMealName(u.items); }
+  function groupKcal(u) { return u.items.reduce(function (s, e) { return s + entryValue(e, "kcal"); }, 0); }
+  window.__nutritionTest.unitsOf = unitsOf;
+  function groupHtml(u) {
+    var key = "g:" + u.gid, open = expanded === key, first = u.items[0], kind = first.kind === "snack" ? "snack" : "meal";
+    return '<li class="item">' +
+      '<button class="item-main" type="button" data-gtoggle="' + esc(u.gid) + '" aria-expanded="' + open + '">' +
+        '<span class="t">' +
+          '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(first.time)) + '</span></div>' +
+          '<div class="n">' + esc(groupName(u)) + '</div>' +
+          '<div class="s">' + itemsText(u.items.length) + (open ? '' : ' · tap to see them') + '</div>' +
+        '</span>' +
+        '<span class="k num">' + fmt(groupKcal(u)) + '</span>' +
+      '</button>' +
+      (open ? '<div class="item-edit">' +
+        '<ul class="sub-items">' + u.items.map(function (e) {
+          return '<li class="sub-item"><span class="t"><div class="n">' + esc(e.name) + '</div><div class="s">' + esc(servingText(e)) + ' · ' + fmt(entryValue(e, "kcal")) + ' kcal</div></span>' +
+            '<div class="stepper"><button type="button" data-dec="' + e.id + '" aria-label="Less">−</button><span class="q num">' + fmtQty(e.qty) + '</span><button type="button" data-inc="' + e.id + '" aria-label="More">+</button></div>' +
+            '<button class="tray-x" type="button" data-remove="' + e.id + '" aria-label="Remove ' + esc(shortName(e.name)) + '">✕</button></li>';
+        }).join("") + '</ul>' +
+        '<div class="edit-row">' +
+          '<input class="time-in" type="time" data-gtime="' + esc(u.gid) + '" value="' + esc(first.time || "") + '" aria-label="Time eaten">' +
+          '<div class="seg small" role="group" aria-label="Meal or snack">' +
+            '<button type="button" data-gsetkind="meal" data-gid="' + esc(u.gid) + '" aria-pressed="' + (kind === "meal") + '">Meal</button>' +
+            '<button type="button" data-gsetkind="snack" data-gid="' + esc(u.gid) + '" aria-pressed="' + (kind === "snack") + '">Snack</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="edit-row"><span></span><button class="remove" type="button" data-gremove="' + esc(u.gid) + '">Remove whole ' + KINDS[kind].toLowerCase() + '</button></div>' +
+      '</div>' : '') +
+      '</li>';
+  }
+
   function stepFor(e) { return isRawUnit(e.unitLabel) ? (e.unitLabel === "g" || e.unitLabel === "ml" ? 10 : 0.5) : 0.5; }
   function findEntry(id) { return state.entries.find(function (x) { return x.id === id; }); }
 
@@ -1037,6 +1099,17 @@ select.in { padding-right: 30px;
     var b = ev.target.closest("button");
     if (!b) return;
     var id, e;
+    if (b.dataset.gtoggle) { var gk = "g:" + b.dataset.gtoggle; expanded = expanded === gk ? null : gk; render(); return; }
+    if (b.dataset.gsetkind) {
+      state.entries.forEach(function (x) { if (x.meal === b.dataset.gid) x.kind = b.dataset.gsetkind; });
+      save(); render(); return;
+    }
+    if (b.dataset.gremove) {
+      var gItems = state.entries.filter(function (x) { return x.meal === b.dataset.gremove; });
+      var gName = groupName({ items: gItems });
+      state.entries = state.entries.filter(function (x) { return x.meal !== b.dataset.gremove; });
+      expanded = null; save(); render(); toast("Removed " + gName); return;
+    }
     if (b.dataset.toggle) { id = +b.dataset.toggle; expanded = expanded === id ? null : id; render(); return; }
     if (b.dataset.setkind) {
       e = findEntry(+b.dataset.id); if (!e) return;
@@ -1054,12 +1127,17 @@ select.in { padding-right: 30px;
       id = +b.dataset.remove;
       e = findEntry(id);
       state.entries = state.entries.filter(function (x) { return x.id !== id; });
-      expanded = null; save(); render();
+      var left = e && e.meal ? state.entries.filter(function (x) { return x.meal === e.meal; }).length : 0;
+      expanded = left >= 2 ? "g:" + e.meal : null; save(); render();
       if (e) toast("Removed " + e.name.split(",")[0]);
     }
   });
   $("meals").addEventListener("change", function (ev) {
     var t = ev.target;
+    if (t.dataset && t.dataset.gtime) {
+      if (validTime(t.value)) { state.entries.forEach(function (x) { if (x.meal === t.dataset.gtime) x.time = t.value; }); save(); mealsDirty = true; }
+      return;
+    }
     if (!t.dataset || !t.dataset.time) return;
     var e = findEntry(+t.dataset.time);
     if (e && validTime(t.value)) { e.time = t.value; save(); mealsDirty = true; }
@@ -1232,12 +1310,26 @@ select.in { padding-right: 30px;
   var searchTimer = null, searchCtrl = null, detailCtrl = null;
   var current = null;        // food being viewed: { fdcId, name, brand, dataType, per100, nutrients, units, unitIndex, qty, loading }
 
+  // Items gathered for one meal before it is logged. Kept on this phone only until "Log meal".
+  var TRAY_KEY = "dads-nutrition-tray";
+  var tray = (function () { try { var t = JSON.parse(localStorage.getItem(TRAY_KEY)); if (t && Array.isArray(t.items)) return t; } catch (e) {} return { items: [], name: "" }; })();
+  function saveTray() { try { localStorage.setItem(TRAY_KEY, JSON.stringify(tray)); } catch (e) {} }
+  function shortName(n) { return String(n || "").split(",")[0].trim(); }
+  function autoMealName(items) {
+    var n = items.map(function (x) { return shortName(x.name); });
+    return n.length > 3 ? n.slice(0, 3).join(" + ") + " + " + (n.length - 3) + " more" : n.join(" + ");
+  }
+  function itemsText(n) { return n + (n === 1 ? " item" : " items"); }
+  window.__nutritionTest.autoMealName = autoMealName;
+
   function renderKind() {
     Array.prototype.forEach.call($("kindSeg").querySelectorAll("button"), function (b) {
       b.setAttribute("aria-pressed", String(b.dataset.kind === sheetKind));
     });
-    var add = $("addBtn");
-    if (add) add.textContent = "Log " + KINDS[sheetKind].toLowerCase();
+    var add = $("addBtn"), more = $("trayBtn"), tl = $("trayLog");
+    if (add && !add.dataset.fixed) add.textContent = "Log " + KINDS[sheetKind].toLowerCase();
+    if (more && !tray.items.length) more.textContent = "+ Add another item to this " + KINDS[sheetKind].toLowerCase();
+    if (tl) tl.textContent = trayLogLabel();
   }
 
   function recents() {
@@ -1284,7 +1376,10 @@ select.in { padding-right: 30px;
   function renderSearchBody() {
     var q = $("search").value.trim();
     $("clearBtn").hidden = !q;
-    var html = suggestHtml(q) + '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
+    var trayBar = tray.items.length ? '<button class="custom-entry tray-bar" type="button" data-tray="1"><span class="ic" aria-hidden="true">🍽</span>' +
+      '<span class="t"><div class="n">Your ' + KINDS[sheetKind].toLowerCase() + ': ' + itemsText(tray.items.length) + ' · ' + fmt(totals(tray.items).kcal) + ' kcal</div>' +
+      '<div class="m">Tap to review and log it, or add more below</div></span><span class="add" aria-hidden="true">›</span></button>' : '';
+    var html = trayBar + suggestHtml(q) + '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
       '<span class="t"><div class="n">Scan barcode</div><div class="m">Packaged foods in one step</div></span><span class="add" aria-hidden="true">›</span></button>' +
       '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
       '<span class="t"><div class="n">Custom food</div><div class="m">Type your own calories and macros</div></span><span class="add" aria-hidden="true">›</span></button>';
@@ -1307,7 +1402,7 @@ select.in { padding-right: 30px;
           var p = per100FromMap(mapFromSearch(f));
           return foodRow('data-pick="g' + i + '"', niceName(f.description), "Per 100 g", p.kcal, "kcal");
         }).join("") + '</ul>';
-        if (results.generic.length > 6 && !results.more) html += '<button class="more-btn" type="button" data-more="1">Show more foods</button>';
+        if (results.generic.length > 6 && !results.more) html += '<button class="more-btn big" type="button" data-more="1">Show more foods</button>';
       } else if (!results.branded.length && !results.packagedLoading) {
         html += '<div class="state"><strong>No everyday foods found</strong>Try fewer words or a different spelling.</div>';
       }
@@ -1324,7 +1419,7 @@ select.in { padding-right: 30px;
         html += '<div class="state"><strong>No packaged foods found</strong>Try the barcode scanner or add it as a custom food.</div>';
       }
       if (results.packagedLoading) html += '<div class="state"><div class="spinner"></div>Searching packaged foods…</div>';
-      else if (!results.packaged) html += '<button class="more-btn" type="button" data-packaged="1">' + (results.packagedError ? "Couldn't load. Try again" : "Search packaged foods") + '</button>';
+      else if (!results.packaged) html += '<button class="more-btn big" type="button" data-packaged="1">' + (results.packagedError ? "Couldn't load. Try again" : "Search packaged foods") + '</button>';
     }
     $("sheetBody").innerHTML = html;
   }
@@ -1458,7 +1553,7 @@ select.in { padding-right: 30px;
     view = v;
     $("backBtn").hidden = v === "search";
     $("searchWrap").hidden = v !== "search";
-    $("sheetTitle").textContent = v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : "Add food";
+    $("sheetTitle").textContent = v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : v === "tray" ? "Your items" : "Add food";
     $("sheetTitle").hidden = v === "detail";
   }
 
@@ -1559,7 +1654,7 @@ select.in { padding-right: 30px;
         (current.dataWarn ? '<div class="data-warn" role="alert"><b>⚠️ Heads up.</b> ' + esc(current.dataWarn) + '</div>' : '') +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
         '<div class="source">' + (current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
-        '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + (qty > 0 ? '' : ' disabled') + '>Log ' + KINDS[sheetKind].toLowerCase() + '</button></div>' +
+        footButtons(qty > 0) +
       '</div>';
     bindTimeField();
 
@@ -1580,8 +1675,22 @@ select.in { padding-right: 30px;
       $("qtyInput").value = fmtQty(current.qty);
       updateNut();
     });
-    $("addBtn").addEventListener("click", addCurrent);
+    bindFoot(addCurrent);
   }
+
+  // One food alone: "Log meal". Several foods: "Add another item", then log them together from the tray.
+  function footButtons(enabled) {
+    var dis = enabled ? '' : ' disabled', kind = KINDS[sheetKind].toLowerCase();
+    if (tray.items.length) return '<div class="detail-foot"><button class="primary" type="button" id="trayBtn"' + dis + '>Add to ' + kind + ' (' + itemsText(tray.items.length) + ' so far)</button>' +
+      '<button class="link-btn foot-alt" type="button" id="addBtn" data-fixed="1"' + dis + '>Log only this item</button></div>';
+    return '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + dis + '>Log ' + kind + '</button>' +
+      '<button class="link-btn foot-alt" type="button" id="trayBtn"' + dis + '>+ Add another item to this ' + kind + '</button></div>';
+  }
+  function bindFoot(fn) {
+    $("addBtn").addEventListener("click", function () { fn(false); });
+    $("trayBtn").addEventListener("click", function () { fn(true); });
+  }
+  function setFootEnabled(on) { ["addBtn", "trayBtn"].forEach(function (id) { var b = $(id); if (b) b.disabled = !on; }); }
 
   function amountText(u, qty, grams) {
     if (u.label === "ml") return fmtG(qty) + " ml";
@@ -1604,13 +1713,13 @@ select.in { padding-right: 30px;
     var u = current.units[current.unitIndex];
     var grams = u.grams * (current.qty || 0);
     $("nutCard").innerHTML = nutHtml(amountFor(current.per100, grams, "kcal"), grams);
-    $("addBtn").disabled = !(current.qty > 0);
+    setFootEnabled(current.qty > 0);
   }
 
-  function addCurrent() {
+  function addCurrent(toTray) {
     if (!current || !(current.qty > 0)) return;
     var u = current.units[current.unitIndex];
-    logEntry({
+    (toTray === true ? addToTray : logEntry)({
       fdcId: current.fdcId, name: current.name, brand: current.brand, dataType: current.dataType, custom: current.custom || undefined,
       barcode: current.barcode || undefined,
       unitLabel: u.label, unitGrams: u.grams, qty: current.qty,
@@ -1627,6 +1736,63 @@ select.in { padding-right: 30px;
     closeSheet();
     toast("Logged " + e.name.split(",")[0] + " as a " + KINDS[e.kind].toLowerCase());
   }
+
+  // ---------- Meal tray: several foods logged as one meal ----------
+  function addToTray(fields) {
+    tray.items.push(fields); saveTray();
+    toast("Added " + shortName(fields.name) + ". " + itemsText(tray.items.length) + " in this " + KINDS[sheetKind].toLowerCase());
+    $("search").value = ""; results = null;
+    backToSearch();
+  }
+  function trayLogLabel() { return "Log " + KINDS[sheetKind].toLowerCase() + " (" + itemsText(tray.items.length) + ")"; }
+  function openTray() {
+    if (!tray.items.length) { backToSearch(); return; }
+    leaveScan(); current = null; $("search").blur();
+    showView("tray"); renderTray(); $("sheetBody").scrollTop = 0;
+  }
+  function renderTray() {
+    var t = totals(tray.items);
+    $("sheetBody").innerHTML = '<div class="detail">' +
+      '<div class="field"><label for="trayName">Name (optional)</label><input id="trayName" type="text" autocomplete="off" value="' + esc(tray.name || "") + '" placeholder="' + esc(autoMealName(tray.items)) + '"></div>' +
+      '<ul class="tray-list">' + tray.items.map(function (f, i) {
+        return '<li class="tray-item"><span class="t"><div class="n">' + esc(f.name) + '</div><div class="m">' + esc(servingText(f)) + (f.brand ? ' · ' + esc(f.brand) : '') + '</div></span>' +
+          '<span class="k num">' + fmt(entryValue(f, "kcal")) + '</span>' +
+          '<button class="tray-x" type="button" data-trayrm="' + i + '" aria-label="Remove ' + esc(shortName(f.name)) + '">✕</button></li>';
+      }).join("") + '</ul>' +
+      '<button class="more-btn big" type="button" data-traymore="1">+ Add another item</button>' +
+      timeFieldHtml() +
+      '<div class="nut-card"><div class="nut-kcal"><div class="v num">' + fmt(t.kcal) + '<small>kcal</small></div><div class="est">Total</div></div>' +
+        '<div class="nut-grid">' + nutCell("Protein", "var(--protein)", t.protein) + nutCell("Carbs", "var(--carbs)", t.carbs) + nutCell("Fat", "var(--fat)", t.fat) + nutCell("Fiber", "var(--fiber)", t.fiber) + '</div></div>' +
+      '<div class="detail-foot"><button class="primary" type="button" id="trayLog">' + trayLogLabel() + '</button></div>' +
+    '</div>';
+    bindTimeField();
+  }
+  function logTray() {
+    if (!tray.items.length) return;
+    var gid = "m" + Date.now().toString(36), time = validTime(sheetTime) ? sheetTime : nowHHMM();
+    var name = String(tray.name || "").trim(), id = nextId(), label = name || autoMealName(tray.items), n = tray.items.length;
+    tray.items.forEach(function (f) {
+      var e = Object.assign({}, f, { id: id++, date: selectedDate, kind: sheetKind, time: time, meal: gid });
+      if (name) e.mealName = name; else delete e.mealName;
+      state.entries.push(e);
+    });
+    tray = { items: [], name: "" }; saveTray();
+    save(); expanded = null; render(); closeSheet();
+    toast("Logged " + label + " (" + itemsText(n) + ")");
+  }
+  $("sheetBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-tray],[data-trayrm],[data-traymore],#trayLog"); if (!b) return;
+    if (b.dataset.tray) { openTray(); return; }
+    if (b.dataset.traymore) { backToSearch(); return; }
+    if (b.id === "trayLog") { logTray(); return; }
+    tray.items.splice(+b.dataset.trayrm, 1);
+    if (!tray.items.length) tray.name = "";
+    saveTray();
+    if (tray.items.length) renderTray(); else backToSearch();
+  });
+  $("sheetBody").addEventListener("input", function (ev) {
+    if (ev.target && ev.target.id === "trayName") { tray.name = ev.target.value; saveTray(); }
+  });
 
   // ---------- Barcode scanner ----------
   var stopScan = null, scanBusy = false, scanLoading = false;
@@ -1839,13 +2005,13 @@ select.in { padding-right: 30px;
         '<div class="grid2" id="moreFields" hidden>' + numField("cSugar", "Sugar", "g") + numField("cSat", "Saturated fat", "g") + numField("cSodium", "Sodium", "mg") + '</div>' +
         '<div class="check" id="cCheck"></div>' +
         timeFieldHtml() +
-        '<div class="detail-foot"><button class="primary" type="button" id="addBtn" disabled>Log ' + KINDS[sheetKind].toLowerCase() + '</button></div>' +
+        footButtons(false) +
       '</div>';
     $("sheetBody").scrollTop = 0;
     bindTimeField();
     $("moreBtn").addEventListener("click", function () { $("moreFields").hidden = false; this.hidden = true; });
     $("sheetBody").querySelector(".form").addEventListener("input", checkCustom);
-    $("addBtn").addEventListener("click", addCustom);
+    bindFoot(addCustom);
     setTimeout(function () { var n = $("cName"); if (n) n.focus(); }, 280);
   }
   function customValues() {
@@ -1857,7 +2023,7 @@ select.in { padding-right: 30px;
   }
   function checkCustom() {
     var v = customValues();
-    $("addBtn").disabled = v.kcal == null;
+    setFootEnabled(v.kcal != null);
     var el = $("cCheck");
     if (v.protein == null && v.carbs == null && v.fat == null) { el.textContent = ""; el.className = "check"; return; }
     var fromMacros = (v.protein || 0) * 4 + (v.carbs || 0) * 4 + (v.fat || 0) * 9;
@@ -1865,7 +2031,7 @@ select.in { padding-right: 30px;
     el.className = "check" + (off ? " warn" : "");
     el.textContent = "Macros add up to about " + fmt(fromMacros) + " kcal." + (off ? " That's far from the calories above, so double-check the numbers." : "");
   }
-  function addCustom() {
+  function addCustom(toTray) {
     var v = customValues();
     if (v.kcal == null) return;
     var name = $("cName").value.trim() || "Custom food";
@@ -1873,7 +2039,7 @@ select.in { padding-right: 30px;
     if (v.sugar != null) nutrients[2000] = v.sugar;
     if (v.sat != null) nutrients[1258] = v.sat;
     if (v.sodium != null) nutrients[1093] = v.sodium;
-    logEntry({
+    (toTray === true ? addToTray : logEntry)({
       custom: true, name: name, brand: "", dataType: "Custom",
       unitLabel: "serving", unitGrams: 100, qty: 1,
       per100: { kcal: v.kcal, protein: v.protein, carbs: v.carbs, fat: v.fat, fiber: v.fiber, est: false },
@@ -2158,7 +2324,9 @@ select.in { padding-right: 30px;
       }).join("") + '</div>' +
       '</section>';
     if (info.list.length) {
-      html += '<section class="card" style="padding:4px 0"><ul class="mini-list">' + info.list.slice().sort(byTime).map(function (e) {
+      html += '<section class="card" style="padding:4px 0"><ul class="mini-list">' + unitsOf(info.list).map(function (u) {
+        var e = u.items[0];
+        if (u.gid) return '<li><span><small>' + esc(fmtTime(e.time)) + '</small>' + esc(groupName(u)) + ' (' + itemsText(u.items.length) + ')</span><span class="num">' + fmt(groupKcal(u)) + '</span></li>';
         return '<li><span><small>' + esc(fmtTime(e.time)) + '</small>' + esc(e.name) + '</span><span class="num">' + fmt(entryValue(e, "kcal")) + '</span></li>';
       }).join("") + '</ul></section>';
     }
@@ -2979,6 +3147,7 @@ select.in { padding-right: 30px;
     return entriesFor(k).slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : a.id - b.id; }).map(function (e) {
       var g = e.unitGrams * e.qty, v = function (key) { var x = amountFor(e.per100, g, key); return x == null ? "" : r1n(x); };
       var label = e.imported ? e.name : e.name + (e.brand ? " (" + e.brand + ")" : "") + " · " + servingText(e);
+      if (e.mealName) label = e.mealName + ": " + label;
       if (e.kind === "snack" && !/^snack/i.test(label)) label = "Snack: " + label;
       return [k, label, v("protein"), v("kcal"), v("carbs"), v("fat"), v("fiber")];
     });
