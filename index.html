@@ -414,7 +414,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .w-hero .sub { color: var(--muted); font-size: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .stat-chip { background: var(--surface-2); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
-.stat-chip.down { color: var(--good); }
+.stat-chip.toward { color: var(--good); }
 .stat-chip span { color: var(--muted); font-weight: 500; }
 .w-log { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .w-log h3, .plan-card h3 { margin: 0; font-size: 16px; font-weight: 600; }
@@ -458,6 +458,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .pace .k { text-align: right; font-weight: 700; font-size: 18px; white-space: nowrap; }
 .pace .k small { display: block; font-family: var(--font-body); font-weight: 500; font-size: 11.5px; color: var(--muted); }
 .tag.aggr { background: var(--warn); color: #fff; margin-left: 6px; vertical-align: 2px; }
+.tag.rec { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); margin-left: 6px; vertical-align: 2px; }
 .macro-targets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .macro-targets .v { font-size: 20px; font-weight: 700; }
 .macro-targets .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
@@ -536,7 +537,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 14</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 15</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -548,9 +549,9 @@ select.in { padding-right: 30px;
   </div>
   <div id="calBody"></div>
   <div class="legend" aria-label="Color key">
-    <span><i class="status-dot" style="--c:var(--good)"></i>At or under target</span>
-    <span><i class="status-dot" style="--c:var(--mid)"></i>Up to 250 over</span>
-    <span><i class="status-dot" style="--c:var(--bad)"></i>More than 250 over</span>
+    <span><i class="status-dot" style="--c:var(--good)"></i><span id="lgGood">At or under target</span></span>
+    <span><i class="status-dot" style="--c:var(--mid)"></i><span id="lgMid">Up to 250 over</span></span>
+    <span><i class="status-dot" style="--c:var(--bad)"></i><span id="lgBad">More than 250 over</span></span>
     <span><i class="status-dot" style="--c:var(--low)"></i>Ate too little</span>
     <span><i class="status-dot" style="--c:var(--track);box-shadow:inset 0 0 0 2px var(--muted)"></i>Not marked complete</span>
   </div>
@@ -786,7 +787,7 @@ select.in { padding-right: 30px;
   // ---------- Storage ----------
   function defaultSettings() {
     // Blank until the person enters their own stats in the Plan tab
-    return { sex: null, birth: "", heightIn: null, startLb: null, activity: "mod", pace: null, goalLb: null };
+    return { sex: null, birth: "", heightIn: null, startLb: null, activity: "mod", goal: null, pace: null, goalLb: null };
   }
   var state = load();
   if (state.entries.length) save(); // keep migrated entries
@@ -843,10 +844,27 @@ select.in { padding-right: 30px;
     open: { label: "Not marked complete", color: "var(--muted)" },
     none: { label: "Nothing logged", color: "var(--track)" }
   };
+  // Gaining goals flip the colors: under target is the miss, over target is fine.
+  function surplusGoal() { var g = goalOf(state.settings); return g === "muscle" || g === "gain"; }
+  function syncStatusLabels() {
+    var up = surplusGoal();
+    STATUS.mid.label = up ? "A little under" : "A little over";
+    STATUS.bad.label = up ? "Under target" : "Over target";
+    if ($("lgGood")) {
+      $("lgGood").textContent = up ? "At or over target" : "At or under target";
+      $("lgMid").textContent = up ? "Up to 250 under" : "Up to 250 over";
+      $("lgBad").textContent = up ? "More than 250 under" : "More than 250 over";
+    }
+  }
   function statusFor(kcal, target, complete, hasEntries) {
     if (!complete) return hasEntries ? "open" : "none";
     kcal = Math.round(kcal);
     if (kcal < floorKcal()) return "low";
+    if (surplusGoal()) {
+      if (kcal >= target) return "good";
+      if (kcal >= target - OVER_YELLOW) return "mid";
+      return "bad";
+    }
     if (kcal <= target) return "good";
     if (kcal <= target + OVER_YELLOW) return "mid";
     return "bad";
@@ -877,7 +895,7 @@ select.in { padding-right: 30px;
     $("todayLink").hidden = isToday;
     var real = realTargets();
     document.querySelector(".cal .sample").hidden = real;
-    $("targetNote").textContent = real ? "Targets come from the Plan tab." : "Targets are samples until you enter your stats and pick a pace in Plan.";
+    $("targetNote").textContent = real ? "Targets come from the Plan tab." : "Targets are samples until you enter your stats and pick a goal in Plan.";
     $("nextDay").disabled = isToday;
     renderComplete();
     var ring = $("ring");
@@ -1967,14 +1985,15 @@ select.in { padding-right: 30px;
       var last = tr[tr.length - 1], w7 = changeOver(tr, 7), w30 = changeOver(tr, 30), goal = state.settings.goalLb;
       function chip(c, label) {
         if (!c) return "";
-        return '<span class="stat-chip' + (c.diff < -0.05 ? ' down' : '') + '">' + signed(c.diff) + ' lb <span>' + (c.full ? label : 'since ' + shortDate(c.since)) + '</span></span>';
+        var g = goalOf(state.settings), toward = g === "lose" ? c.diff < -0.05 : (g === "muscle" || g === "gain") ? c.diff > 0.05 : false;
+        return '<span class="stat-chip' + (toward ? ' toward' : '') + '">' + signed(c.diff) + ' lb <span>' + (c.full ? label : 'since ' + shortDate(c.since)) + '</span></span>';
       }
       html += '<section class="card w-hero">' +
         '<div class="lbl">Trend weight</div>' +
         '<div class="big num">' + fmtLb(last.trend) + '<small>lb</small></div>' +
         '<div class="sub">Last weigh-in: ' + fmtLb(last.lb) + ' lb on ' + esc(shortDate(last.date)) + '</div>' +
         '<div class="chips">' + chip(w7, "last 7 days") + chip(w30, "last 30 days") +
-          (goal ? '<span class="stat-chip">' + (last.trend > goal ? fmtLb(last.trend - goal) + ' lb <span>to goal</span>' : 'Goal reached <span>(' + fmtLb(goal) + ' lb)</span>') + '</span>' : '') + '</div>' +
+          (goal ? '<span class="stat-chip">' + (Math.abs(last.trend - goal) >= 0.5 ? fmtLb(Math.abs(last.trend - goal)) + ' lb <span>to goal</span>' : 'Goal reached <span>(' + fmtLb(goal) + ' lb)</span>') + '</span>' : '') + '</div>' +
         '<p class="hint">The trend smooths out daily ups and downs from water and food, so it shows real progress.</p>' +
         '</section>';
     } else {
@@ -2031,12 +2050,31 @@ select.in { padding-right: 30px;
     { id: "very",  label: "Very active",       desc: "Hard exercise 6 to 7 days a week", f: 1.725 },
     { id: "extra", label: "Extra active",      desc: "Hard daily training plus a physical job", f: 1.9 }
   ];
-  var PACES = [
-    { id: "0",   lb: 0,   label: "Maintain weight" },
-    { id: "0.5", lb: 0.5, label: "Lose 0.5 lb a week" },
-    { id: "1",   lb: 1,   label: "Lose 1 lb a week" },
-    { id: "2",   lb: 2,   label: "Lose 2 lb a week", aggressive: true }
+  var GOALS = [
+    { id: "lose",     label: "Lose fat",     desc: "Calorie deficit, keep muscle" },
+    { id: "maintain", label: "Maintain",     desc: "Stay at the same weight" },
+    { id: "muscle",   label: "Build muscle", desc: "Small surplus, slow lean gain" },
+    { id: "gain",     label: "Gain weight",  desc: "Bigger surplus, for people who need to put on weight" }
   ];
+  // About 3,500 kcal per pound, so 500 kcal a day is about 1 lb a week.
+  // Build muscle: 10-15% over maintenance, inside the 10-20% range for lean gains (Iraki 2019).
+  var PACES = [
+    { id: "0.5",  goal: "lose",     delta: -250,  label: "Lose 0.5 lb a week", sub: "Slow and easy to stick with" },
+    { id: "1",    goal: "lose",     delta: -500,  label: "Lose 1 lb a week",   sub: "A solid pace for losing fat while keeping muscle", rec: true },
+    { id: "2",    goal: "lose",     delta: -1000, label: "Lose 2 lb a week",   aggressive: true },
+    { id: "0",    goal: "maintain", delta: 0,     label: "Maintain weight",    sub: "Eat about what you burn", rec: true },
+    { id: "m10",  goal: "muscle",   pct: 0.10,    label: "Lean gain (+10%)",   sub: "Slow, least fat gained", rec: true },
+    { id: "m15",  goal: "muscle",   pct: 0.15,    label: "Standard gain (+15%)", sub: "Faster, a bit more fat" },
+    { id: "g0.5", goal: "gain",     delta: 250,   label: "Gain 0.5 lb a week", sub: "Steady and easy to stick with", rec: true },
+    { id: "g1",   goal: "gain",     delta: 500,   label: "Gain 1 lb a week",   sub: "Faster, more of the gain will be fat" }
+  ];
+  // Older versions saved only a pace: "0" meant maintain, any other pace meant losing.
+  function goalOf(s) {
+    if (s.goal) return s.goal;
+    if (s.pace == null) return null;
+    return s.pace === "0" ? "maintain" : "lose";
+  }
+  function recPace(goal) { return PACES.find(function (p) { return p.goal === goal && p.rec; }); }
   function ageOn(birth, k) {
     if (!birth) return null;
     var b = parseKey(birth), d = parseKey(k || dayKey());
@@ -2058,7 +2096,10 @@ select.in { padding-right: 30px;
     var bmr = 10 * kg + 6.25 * cm - 5 * age + (s.sex === "female" ? -161 : 5);
     var act = ACTIVITY.find(function (a) { return a.id === s.activity; }) || ACTIVITY[2];
     var maint = bmr * act.f;
-    return { bmr: bmr, maint: maint, age: age, paces: PACES.map(function (p) { return { pace: p, kcal: Math.round((maint - p.lb * 500) / 10) * 10 }; }) };
+    return { bmr: bmr, maint: maint, age: age, paces: PACES.map(function (p) {
+      var k = p.pct != null ? maint * (1 + p.pct) : maint + p.delta;
+      return { pace: p, kcal: Math.round(k / 10) * 10 };
+    }) };
   }
   function macroTargets(kcal, weightLb) {
     var protein = Math.round(0.8 * weightLb);
@@ -2070,45 +2111,64 @@ select.in { padding-right: 30px;
   function applyTargets() {
     var s = state.settings;
     var w = currentWeight(), c = calc(s, w);
-    if (s.pace == null || !c) { Object.assign(TARGETS, SAMPLE_TARGETS); return; }
-    var hit = c.paces.find(function (x) { return x.pace.id === s.pace; }) || c.paces[2];
+    var hit = c && chosenPace(c, s);
+    syncStatusLabels();
+    if (!hit) { Object.assign(TARGETS, SAMPLE_TARGETS); return; }
     Object.assign(TARGETS, macroTargets(hit.kcal, w));
   }
-  function realTargets() { return state.settings.pace != null && !!calc(state.settings, currentWeight()); }
+  function chosenPace(c, s) {
+    var g = goalOf(s);
+    return c.paces.find(function (x) { return x.pace.id === s.pace && x.pace.goal === g; }) || null;
+  }
+  function realTargets() { var c = calc(state.settings, currentWeight()); return !!(c && chosenPace(c, state.settings)); }
+  window.__nutritionTest.goalOf = goalOf;
   window.__nutritionTest.calc = calc; window.__nutritionTest.macroTargets = macroTargets; window.__nutritionTest.ageOn = ageOn;
 
   function renderPlan() {
     planDirty = false;
     var s = state.settings, w = currentWeight(), c = calc(s, w), hasWeigh = state.weights.length > 0;
     var missing = statsMissing(s, w);
+    var goal = goalOf(s), hit = c && chosenPace(c, s);
+    var goalNote = {
+      lose: "The target below maintenance is what creates the fat loss.",
+      maintain: "This target keeps your weight about the same.",
+      muscle: "The small surplus pays for building muscle. It goes to muscle only with strength training; without it, a surplus mostly adds fat.",
+      gain: "The surplus above maintenance adds weight. Strength training helps more of it be muscle."
+    };
     var top = '<section class="card plan-card">' +
       '<div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Daily calorie target</div>' +
       '<div class="target-big num">' + fmt(TARGETS.kcal) + '<small>kcal</small></div>' +
-      '<p class="note">' + (!c ? "This is a sample target. Enter your stats below to get your own." : s.pace == null ? "This is a sample target. Pick a pace below to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. The target below it is what creates the weight loss.") + '</p>' +
+      '<p class="note">' + (!c ? "This is a sample target. Enter your stats below to get your own." : !goal ? "This is a sample target. Pick your goal below to set your real one." : !hit ? "This is a sample target. Pick a pace below to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. " + goalNote[goal]) + '</p>' +
       '</section>';
 
+    var goals = '<div class="section-h"><h2>Your goal</h2>' + (goal ? '' : '<span>Pick one</span>') + '</div>' +
+      '<section class="card plan-card" role="radiogroup" aria-label="Goal">' + GOALS.map(function (g) {
+        return '<button class="pace" type="button" role="radio" data-goal="' + g.id + '" aria-checked="' + (goal === g.id) + '">' +
+          '<span class="radio" aria-hidden="true"></span>' +
+          '<span class="t"><b>' + g.label + '</b><small>' + g.desc + '</small></span><span></span></button>';
+      }).join("") + '</section>';
+
     var paces = "", macros = "";
-    if (c) {
-      paces = '<div class="section-h"><h2>Choose a pace</h2><span>Maintenance ≈ ' + fmt(c.maint) + '</span></div>' +
-        '<section class="card plan-card" role="radiogroup" aria-label="Weight loss pace">' + c.paces.map(function (x) {
+    if (c && goal) {
+      var list = c.paces.filter(function (x) { return x.pace.goal === goal; });
+      if (list.length > 1) paces = '<div class="section-h"><h2>Choose a pace</h2><span>Maintenance ≈ ' + fmt(c.maint) + '</span></div>' +
+        '<section class="card plan-card" role="radiogroup" aria-label="Pace">' + list.map(function (x) {
         var p = x.pace, low = x.kcal < floorKcal();
-        var sub = p.aggressive ? '<small class="warn">Very strict and not recommended. Losing this fast makes losing muscle more likely.</small>'
-          : p.lb === 0 ? '<small>Stay at the current weight</small>'
-          : p.lb === 1 ? '<small>A solid pace for losing fat while keeping muscle</small>'
-          : '<small>Slow and easy to stick with</small>';
+        var sub = p.aggressive ? '<small class="warn">Very strict and not recommended. Losing this fast makes losing muscle more likely.</small>' : '<small>' + p.sub + '</small>';
         if (low) sub += '<small class="warn" style="display:block">Below ' + fmt(floorKcal()) + ' kcal. Too low.</small>';
         return '<button class="pace" type="button" role="radio" data-pace="' + p.id + '" aria-checked="' + (s.pace === p.id) + '">' +
           '<span class="radio" aria-hidden="true"></span>' +
           '<span class="t"><b>' + p.label + (p.aggressive ? '<span class="tag aggr">Aggressive</span>' : '') + '</b>' + sub + '</span>' +
           '<span class="k num">' + fmt(x.kcal) + '<small>kcal a day</small></span></button>';
       }).join("") + '</section>';
-
-      var mt = s.pace != null ? TARGETS : macroTargets((c.paces[2]).kcal, w);
-      macros = '<div class="section-h"><h2>Macro targets</h2><span>' + (s.pace != null ? "In use" : "Preview at 1 lb a week") + '</span></div>' +
+    }
+    if (c) {
+      var mt = hit ? TARGETS : macroTargets(Math.round(c.maint / 10) * 10, w);
+      macros = '<div class="section-h"><h2>Macro targets</h2><span>' + (hit ? "In use" : "Preview at maintenance") + '</span></div>' +
         '<section class="card plan-card"><div class="macro-targets">' + MACROS.map(function (m) {
           return '<div><div class="v num">' + fmt(mt[m.key]) + '<span style="font-size:12px"> g</span></div><div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div></div>';
         }).join("") + '</div>' +
-        '<p class="note">Protein is 0.8 g per pound of body weight, inside the range research supports for keeping muscle while losing fat. Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest.</p></section>';
+        '<p class="note">Protein is 0.8 g per pound of body weight, inside the range research supports for keeping and building muscle. Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest.</p></section>';
     }
 
     var ft = s.heightIn ? Math.floor(s.heightIn / 12) : null, inch = s.heightIn ? s.heightIn % 12 : 0;
@@ -2133,9 +2193,9 @@ select.in { padding-right: 30px;
         '<div><label class="lab" for="pGoal">Goal weight (lb)</label><input class="in num-in" id="pGoal" type="text" inputmode="decimal" placeholder="Optional" value="' + esc(s.goalLb == null ? "" : s.goalLb) + '"></div>' +
       '</div></section>';
 
-    var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below it. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with your doctor before starting, especially with any health condition.</p></section>';
+    var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below or above it. Build muscle eats 10 or 15% above maintenance, inside the 10 to 20% range research supports for gaining muscle with less fat. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with your doctor before starting, especially with any health condition.</p></section>';
 
-    var html = c ? top + paces + macros + stats + how : top + stats + how;
+    var html = top + goals + paces + macros + stats + how;
     $("planBody").innerHTML = '<div class="cal-page">' + html + '</div>';
   }
 
@@ -2148,7 +2208,13 @@ select.in { padding-right: 30px;
   }
   $("planBody").addEventListener("click", function (ev) {
     var b = ev.target.closest("button"); if (!b) return;
-    if (b.dataset.pace) {
+    if (b.dataset.goal) {
+      var s = state.settings, g = b.dataset.goal;
+      if (goalOf(s) === g) { if (!s.goal) { s.goal = g; save(); } return; }
+      s.goal = g; s.pace = recPace(g).id; planChanged();
+      if (realTargets()) toast("Daily target set to " + fmt(TARGETS.kcal) + " kcal");
+    } else if (b.dataset.pace) {
+      state.settings.goal = goalOf(state.settings);
       state.settings.pace = b.dataset.pace; planChanged();
       toast("Daily target set to " + fmt(TARGETS.kcal) + " kcal");
     } else if (b.dataset.sex) { state.settings.sex = b.dataset.sex; planChanged(); }
