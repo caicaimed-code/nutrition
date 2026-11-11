@@ -413,6 +413,12 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .w-hero .big small { font-family: var(--font-body); font-size: 16px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
 .w-hero .sub { color: var(--muted); font-size: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.imp-ta { width: 100%; min-height: 130px; resize: vertical; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 14px; padding: 12px; font: 14px/1.4 var(--font-body); }
+.imp-ta:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.imp-sum { font-size: 14px; line-height: 1.45; background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.imp-sum.bad { border: 1px solid var(--warn); }
+.imp-chk { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.imp-chk input { width: 20px; height: 20px; margin-top: 1px; flex: none; }
 .suggest { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 10px; }
 .suggest .sg { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 8px 14px; font-size: 15px; color: var(--muted); min-height: 38px; }
 .suggest .sg b { color: var(--fg); font-weight: 700; }
@@ -598,7 +604,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 18</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 19</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -629,6 +635,7 @@ select.in { padding-right: 30px;
   <h1 class="page-title" id="planTitle">Plan</h1>
   <div id="planBody"></div>
   <div id="backupBody" class="cal-page" hidden></div>
+  <div id="importBody" class="cal-page" hidden></div>
 </div>
 
 <div class="app cal-page" id="learnPage" hidden>
@@ -2467,10 +2474,11 @@ select.in { padding-right: 30px;
     else if (planView === "backup") html = "";
     else html = top + planBoxes(s, w, c, goal, hit, missing);
     $("planBody").innerHTML = html ? '<div class="cal-page">' + html + '</div>' : '';
-    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup" };
+    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import" };
     $("planTitle").textContent = titles[planView];
     $("planTop").hidden = planView === "home";
     $("backupBody").hidden = planView !== "backup";
+    $("importBody").hidden = planView !== "backup";
   }
   var planView = "home";
   function planBoxes(s, w, c, goal, hit, missing) {
@@ -2496,7 +2504,7 @@ select.in { padding-right: 30px;
     if (!cloudUser) return "Off. Tap to sign in and back up your data.";
     return (cloudState === "ok" ? "Backed up" : cloudState === "error" ? "Not backed up yet" : "Backing up…") + " · " + cloudUser.email;
   }
-  function openPlanView(v) { planView = v; renderPlan(); renderBackup(); window.scrollTo(0, 0); }
+  function openPlanView(v) { planView = v; renderPlan(); renderBackup(); if (v === "backup") renderImport(); window.scrollTo(0, 0); }
   $("planBack").addEventListener("click", function () { openPlanView("home"); });
 
   var planTimer = null, planAnim = false;
@@ -2554,6 +2562,133 @@ select.in { padding-right: 30px;
   });
 
   applyTargets();
+
+
+  // ---------- Import a food log (paste rows copied from a spreadsheet) ----------
+  // Reads Date, Meal/Food, Calories, Protein, Carbs, Fat and Fiber columns. Never invents numbers:
+  // a blank macro stays blank and shows "not available". Times are placeholders you can edit.
+  function parseTable(text) {
+    var delim = text.indexOf("\t") >= 0 ? "\t" : ",";
+    var rows = [], row = [], cell = "", q = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c;
+      } else if (c === '"' && cell === "") q = true;
+      else if (c === delim) { row.push(cell); cell = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(cell); cell = ""; rows.push(row); row = [];
+      } else cell += c;
+    }
+    row.push(cell); rows.push(row);
+    return rows.filter(function (r) { return r.some(function (x) { return x.trim(); }); });
+  }
+  function importDate(v) {
+    v = String(v || "").trim(); var m, y, mo, d;
+    if ((m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))) { mo = +m[1]; d = +m[2]; y = +m[3]; if (y < 100) y += 2000; }
+    else return null;
+    var dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return dayKey(dt);
+  }
+  function importNum(v) { var n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) && n >= 0 ? n : null; }
+  var IMPORT_SLOTS = ["08:00", "12:00", "15:00", "18:00", "20:30", "22:00", "23:00"];
+  var IMPORT_TIMES = [[/^breakfast/i, "08:00"], [/^lunch/i, "12:30"], [/^dinner/i, "18:30"], [/^pre-?\s?workout/i, "16:00"], [/^late night/i, "22:00"], [/^bedtime/i, "22:30"]];
+  function parseImport(text) {
+    var rows = parseTable(text || ""), out = { entries: [], skipped: 0, error: null };
+    if (!rows.length) return out;
+    var hi = -1, col = {};
+    for (var r = 0; r < rows.length && hi < 0; r++) {
+      var c = {};
+      rows[r].forEach(function (h, j) {
+        var t = " " + h.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
+        if (c.date == null && /\sdate\s/.test(t)) c.date = j;
+        else if (c.name == null && /\s(meal|food|item|description|name)\s/.test(t)) c.name = j;
+        else if (c.kcal == null && /\s(calories|calorie|kcal|cals)\s/.test(t)) c.kcal = j;
+        else if (c.protein == null && /\sprotein\s/.test(t)) c.protein = j;
+        else if (c.carbs == null && /\s(carbs|carbohydrates|carbohydrate|carb)\s/.test(t)) c.carbs = j;
+        else if (c.fat == null && /\s(fat|fats)\s/.test(t)) c.fat = j;
+        else if (c.fiber == null && /\s(fiber|fibre)\s/.test(t)) c.fiber = j;
+      });
+      if (c.date != null && c.kcal != null) { hi = r; col = c; }
+    }
+    if (hi < 0) { out.error = "Couldn't find the column titles. Copy the title row too: it needs Date and Calories columns."; return out; }
+    var perDay = {}, today = dayKey();
+    rows.slice(hi + 1).forEach(function (row) {
+      var date = importDate(row[col.date]), kcal = importNum(row[col.kcal]);
+      var name = String(col.name != null ? row[col.name] || "" : "").replace(/\s+/g, " ").trim();
+      if (!date || kcal == null || date > today) { if (String(row[col.date] || "").trim() || kcal != null) out.skipped++; return; }
+      var i = perDay[date] = (perDay[date] || 0);
+      perDay[date]++;
+      var time = IMPORT_SLOTS[Math.min(i, IMPORT_SLOTS.length - 1)];
+      IMPORT_TIMES.forEach(function (p) { if (p[0].test(name)) time = p[1]; });
+      out.entries.push({
+        date: date, name: name || "Imported food", time: time, kind: /^snack/i.test(name) ? "snack" : "meal",
+        per100: { kcal: kcal, protein: col.protein != null ? importNum(row[col.protein]) : null, carbs: col.carbs != null ? importNum(row[col.carbs]) : null,
+          fat: col.fat != null ? importNum(row[col.fat]) : null, fiber: col.fiber != null ? importNum(row[col.fiber]) : null, est: false }
+      });
+    });
+    return out;
+  }
+  function importKey(date, name, kcal) { return date + "|" + name.toLowerCase() + "|" + Math.round(kcal); }
+  function planImport(text) {
+    var p = parseImport(text), have = {};
+    state.entries.forEach(function (e) { if (e.per100) have[importKey(e.date, e.name || "", e.per100.kcal || 0)] = true; });
+    p.fresh = p.entries.filter(function (e) { return !have[importKey(e.date, e.name, e.per100.kcal)]; });
+    p.dupes = p.entries.length - p.fresh.length;
+    return p;
+  }
+  function applyImport(p, markDone) {
+    var id = nextId(), dates = {};
+    p.fresh.forEach(function (e) {
+      state.entries.push({ id: id++, date: e.date, kind: e.kind, time: e.time, custom: true, name: e.name, brand: "", dataType: "Custom",
+        unitLabel: "serving", unitGrams: 100, qty: 1, per100: e.per100, nutrients: {}, imported: true });
+      dates[e.date] = true;
+    });
+    if (markDone) Object.keys(dates).forEach(function (k) { if (k < dayKey() && !state.days[k]) state.days[k] = { complete: true, target: TARGETS.kcal }; });
+    save(); render();
+    return Object.keys(dates).length;
+  }
+  window.__nutritionTest.parseImport = parseImport; window.__nutritionTest.planImport = planImport;
+  var importDone = "";
+  function renderImport() {
+    var box = $("importBody"); if (!box) return;
+    box.innerHTML = '<section class="card plan-card">' +
+      '<div><b style="font-family:var(--font-display);font-size:17px">Import a food log</b></div>' +
+      '<p class="note" style="margin:0;font-size:14px;color:var(--fg)">Moving from a spreadsheet? Select the rows in it, copy, and paste them here. It reads these columns: <b>Date, Meal (or Food), Calories, Protein, Carbs, Fat, Fiber</b>. Copy the title row too.</p>' +
+      '<textarea class="imp-ta" id="impText" placeholder="Paste here" aria-label="Pasted rows" spellcheck="false"></textarea>' +
+      '<div id="impSum"></div>' + (importDone ? '<p class="note" style="margin:0;color:var(--good);font-weight:600">' + esc(importDone) + '</p>' : '') +
+      '<div id="impAct"></div></section>';
+    importDone = "";
+  }
+  function renderImportPreview() {
+    var text = $("impText").value, sum = $("impSum"), act = $("impAct");
+    if (!text.trim()) { sum.innerHTML = ""; act.innerHTML = ""; return; }
+    var p = planImport(text);
+    if (p.error) { sum.innerHTML = '<div class="imp-sum bad" role="alert">' + esc(p.error) + '</div>'; act.innerHTML = ""; return; }
+    var days = {}; p.entries.forEach(function (e) { days[e.date] = true; });
+    var ks = Object.keys(days).sort(), noFiber = p.fresh.filter(function (e) { return e.per100.fiber == null; }).length;
+    var lines = ['<b>' + p.fresh.length + ' new ' + (p.fresh.length === 1 ? 'entry' : 'entries') + '</b>' + (ks.length ? ' across ' + ks.length + ' ' + (ks.length === 1 ? 'day' : 'days') + ' (' + shortDate(ks[0]) + (ks.length > 1 ? ' to ' + shortDate(ks[ks.length - 1]) : '') + ')' : '')];
+    if (p.dupes) lines.push(p.dupes + ' already in the app, so they will be skipped.');
+    if (p.skipped) lines.push(p.skipped + ' row' + (p.skipped === 1 ? '' : 's') + ' skipped (no valid date or calories, or a future date).');
+    if (noFiber) lines.push(noFiber + ' without fiber will show "not available".');
+    if (p.fresh.length) lines.push('Times are placeholders (breakfast 8:00 and so on). Tap a time on Today to change it.');
+    sum.innerHTML = '<div class="imp-sum">' + lines.join('<br>') + '</div>';
+    act.innerHTML = p.fresh.length ?
+      (realTargets() ? '<label class="imp-chk"><input type="checkbox" id="impDone"><span>Also mark the days before today as complete, using today\'s target of ' + fmt(TARGETS.kcal) + ' kcal, so the calendar shows colors.</span></label>' : '') +
+      '<button class="primary" type="button" id="impGo" style="margin-top:6px">Import ' + p.fresh.length + ' ' + (p.fresh.length === 1 ? 'entry' : 'entries') + '</button>' : "";
+  }
+  $("importBody").addEventListener("input", function (ev) { if (ev.target.id === "impText") renderImportPreview(); });
+  $("importBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("#impGo"); if (!b) return;
+    var p = planImport($("impText").value); if (!p.fresh.length) return;
+    var n = applyImport(p, $("impDone") && $("impDone").checked);
+    importDone = "Imported " + p.fresh.length + " " + (p.fresh.length === 1 ? "entry" : "entries") + " across " + n + " " + (n === 1 ? "day" : "days") + ". Find them on the Today and Calendar tabs.";
+    renderImport();
+    toast("Imported " + p.fresh.length + " entries");
+  });
 
   // ---------- Cloud backup ----------
   // Firebase project settings. These are safe to be public: the database rules decide who can read or write.
