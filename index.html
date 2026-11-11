@@ -671,7 +671,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 29</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 30</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -793,7 +793,14 @@ select.in { padding-right: 30px;
   function r1(n) { return Math.round(n * 10) / 10; }
   function fmtQty(q) { return (Math.round(q * 100) / 100).toString(); }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
-  function dayKey(d) { d = d || new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  // The food day runs until 3 AM. Before 3 AM it is still "yesterday" for logging.
+  var DAY_START_HOUR = 3;
+  function foodNow() {
+    var d = new Date();
+    if (d.getHours() < DAY_START_HOUR) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12);
+    return d;
+  }
+  function dayKey(d) { d = d || foodNow(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
   function nowHHMM() { var d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
   function validTime(t) { return /^\d{2}:\d{2}$/.test(t || ""); }
   function fmtTime(t) {
@@ -801,7 +808,13 @@ select.in { padding-right: 30px;
     var h = +t.slice(0, 2), m = t.slice(3, 5);
     return (h % 12 || 12) + ":" + m + " " + (h < 12 ? "AM" : "PM");
   }
-  function byTime(a, b) { return (a.time || "").localeCompare(b.time || "") || a.id - b.id; }
+  // Times before 3 AM belong to the end of the food day, so they sort after the evening.
+  function timeOrder(t) {
+    if (!validTime(t)) return -1;
+    var h = +t.slice(0, 2), m = +t.slice(3, 5);
+    return (h < DAY_START_HOUR ? h + 24 : h) * 60 + m;
+  }
+  function byTime(a, b) { return timeOrder(a.time) - timeOrder(b.time) || a.id - b.id; }
   function parseNum(v) { var n = parseFloat(String(v).replace(",", ".")); return isFinite(n) && n >= 0 ? n : null; }
 
   function niceName(s) {
@@ -3388,7 +3401,7 @@ select.in { padding-right: 30px;
   function timeText(ms) {
     if (!ms) return "";
     var d = new Date(ms), t = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    return dayKey(d) === dayKey() ? "today at " + t : shortDate(dayKey(d)) + " at " + t;
+    return dayKey(d) === dayKey(new Date()) ? "today at " + t : shortDate(dayKey(d)) + " at " + t;
   }
   function setCloud(st) { cloudState = st; renderCloudNote(); if (currentTab === "plan") renderBackup(); }
   function renderCloudNote() {
@@ -3490,7 +3503,7 @@ select.in { padding-right: 30px;
   function gsCfg() { var c = state.settings.sheet; return c && c.url && c.key ? c : null; }
   function r1n(v) { return v == null ? "" : Math.round(v * 10) / 10; }
   function gsRowsFor(k) {
-    return entriesFor(k).slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : a.id - b.id; }).map(function (e) {
+    return entriesFor(k).slice().sort(byTime).map(function (e) {
       var g = e.unitGrams * e.qty, v = function (key) { var x = amountFor(e.per100, g, key); return x == null ? "" : r1n(x); };
       var label = e.imported ? e.name : e.name + (e.brand ? " (" + e.brand + ")" : "") + " · " + servingText(e);
       if (e.mealName) label = e.mealName + ": " + label;
@@ -3584,13 +3597,14 @@ select.in { padding-right: 30px;
 
   // New day while the app stays open
   var lastDay = dayKey();
-  document.addEventListener("visibilitychange", function () {
-    if (!document.hidden && dayKey() !== lastDay) {
-      if (selectedDate === lastDay) selectedDate = dayKey();
-      lastDay = dayKey(); expanded = null;
-      if (currentTab === "cal") renderCalendar(); else render();
-    }
-  });
+  function rollDay() {
+    if (document.hidden || dayKey() === lastDay) return;
+    if (selectedDate === lastDay) selectedDate = dayKey();
+    lastDay = dayKey(); expanded = null;
+    if (currentTab === "cal") renderCalendar(); else render();
+  }
+  document.addEventListener("visibilitychange", rollDay);
+  setInterval(rollDay, 60000);
 
   render();
 })();
