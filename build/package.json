@@ -2,6 +2,13 @@
   "name": "dads-nutrition-cloud",
   "private": true,
   "description": "Builds ../cloud.js (Firebase sign-in + Firestore) for the app. Run: npm install && npm run build",
-  "scripts": { "build": "esbuild cloud-src.js --bundle --minify --format=iife --target=es2019 --outfile=../cloud.js" },
-  "devDependencies": { "firebase": "11.10.0", "esbuild": "0.25.5" }
+  "scripts": {
+    "build": "esbuild cloud-src.js --bundle --minify --format=iife --target=es2019 --outfile=../cloud.js && esbuild scan-src.js --bundle --minify --format=iife --target=es2019 --outfile=../scan.js"
+  },
+  "devDependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
+    "esbuild": "0.25.5",
+    "firebase": "11.10.0"
+  }
 }

@@ -183,6 +183,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .seg.small button { height: 34px; font-size: 14px; }
 
 /* Custom food */
+.scan-box { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 18px; overflow: hidden; background: #000; }
+.scan-box video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-frame { position: absolute; left: 10%; right: 10%; top: 28%; bottom: 28%; border: 2px solid rgba(255,255,255,.85); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,.35); pointer-events: none; }
+.scan-frame i { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: #ff4d4d; opacity: .9; }
+.scan-msg { text-align: center; font-size: 15px; font-weight: 600; margin: 12px 0 2px; }
+.scan-sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.45; }
+.scan-wrap { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
+.scan-manual { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 6px; }
+.scan-manual .btn-sm { height: 50px; padding: 0 18px; }
 .custom-entry { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); text-align: left; }
 .custom-entry .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; font-size: 18px; flex: none; }
 .custom-entry .t { flex: 1; min-width: 0; }
@@ -525,7 +534,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 12</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 13</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1011,7 +1020,9 @@ select.in { padding-right: 30px;
   function renderSearchBody() {
     var q = $("search").value.trim();
     $("clearBtn").hidden = !q;
-    var html = '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
+    var html = '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
+      '<span class="t"><div class="n">Scan barcode</div><div class="m">Packaged foods in one step</div></span><span class="add" aria-hidden="true">›</span></button>' +
+      '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
       '<span class="t"><div class="n">Custom food</div><div class="m">Type your own calories and macros</div></span><span class="add" aria-hidden="true">›</span></button>';
     if (q.length < 2) {
       var rec = recents();
@@ -1157,7 +1168,7 @@ select.in { padding-right: 30px;
     view = v;
     $("backBtn").hidden = v === "search";
     $("searchWrap").hidden = v !== "search";
-    $("sheetTitle").textContent = v === "custom" ? "Custom food" : "Add food";
+    $("sheetTitle").textContent = v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : "Add food";
     $("sheetTitle").hidden = v === "detail";
   }
 
@@ -1173,9 +1184,12 @@ select.in { padding-right: 30px;
       units: buildUnits(item),
       unitIndex: 0,
       qty: null,
-      loading: true
+      loading: true,
+      barcode: item.__barcode || undefined,
+      scanDefault: item.__barcode ? { amount: item.servingSize > 0 ? item.servingSize : 100 } : null
     };
     current.qty = defaultQty(current.units[0]);
+    if (current.scanDefault) applyScanDefault();
     showView("detail");
     renderDetail();
     $("sheetBody").scrollTop = 0;
@@ -1199,6 +1213,7 @@ select.in { padding-right: 30px;
         else current.unitIndex = keep;
       } else if (keep >= 0) current.unitIndex = keep;
       else { current.unitIndex = 0; current.qty = defaultQty(merged[0]); }
+      if (current.scanDefault && !current.userEdited) applyScanDefault();
       current.loading = false;
       renderDetail();
     }).catch(function (err) {
@@ -1252,7 +1267,7 @@ select.in { padding-right: 30px;
         '</div>' +
         timeFieldHtml() +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
-        '<div class="source">' + (current.custom ? 'Custom food you entered' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
+        '<div class="source">' + (current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
         '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + (qty > 0 ? '' : ' disabled') + '>Log ' + KINDS[sheetKind].toLowerCase() + '</button></div>' +
       '</div>';
     bindTimeField();
@@ -1261,7 +1276,7 @@ select.in { padding-right: 30px;
       var raw = this.value.replace(",", ".");
       var n = parseFloat(raw);
       current.qty = isFinite(n) && n > 0 ? n : 0;
-      current.touched = true;
+      current.touched = true; current.userEdited = true;
       updateNut();
     });
     $("qtyInput").addEventListener("focus", function () { this.select(); });
@@ -1270,7 +1285,7 @@ select.in { padding-right: 30px;
       current.unitIndex = +this.value;
       var next = current.units[current.unitIndex];
       if (isRawUnit(next.label) !== isRawUnit(prev.label) || (next.label === "g") !== (prev.label === "g")) current.qty = defaultQty(next);
-      current.touched = true;
+      current.touched = true; current.userEdited = true;
       $("qtyInput").value = fmtQty(current.qty);
       updateNut();
     });
@@ -1306,6 +1321,7 @@ select.in { padding-right: 30px;
     var u = current.units[current.unitIndex];
     logEntry({
       fdcId: current.fdcId, name: current.name, brand: current.brand, dataType: current.dataType, custom: current.custom || undefined,
+      barcode: current.barcode || undefined,
       unitLabel: u.label, unitGrams: u.grams, qty: current.qty,
       per100: current.per100, nutrients: current.nutrients
     });
@@ -1319,6 +1335,178 @@ select.in { padding-right: 30px;
     render();
     closeSheet();
     toast("Logged " + e.name.split(",")[0] + " as a " + KINDS[e.kind].toLowerCase());
+  }
+
+  // ---------- Barcode scanner ----------
+  var stopScan = null, scanBusy = false, scanLoading = false;
+  function leaveScan() { if (stopScan) { try { stopScan(); } catch (e) {} stopScan = null; } scanBusy = false; }
+
+  // Scanned foods start in grams (or ml) with the label's serving size filled in, so you only change the number
+  function applyScanDefault() {
+    var want = current.units.findIndex(function (u) { return u.label === "ml"; });
+    var gi = current.units.findIndex(function (u) { return u.label === "g"; });
+    // Liquids (serving listed in ml) start in ml; everything else in grams
+    var liquidServing = current.units[0] && /\bml\)/.test(current.units[0].label);
+    var i = liquidServing && want >= 0 ? want : gi;
+    if (i < 0) return;
+    current.unitIndex = i;
+    current.qty = current.scanDefault.amount;
+    current.touched = true;
+  }
+
+  function scanMessage(title, sub) {
+    var m = $("scanMsg"), s2 = $("scanSub");
+    if (m) m.textContent = title;
+    if (s2) s2.textContent = sub || "";
+  }
+  function openScan() {
+    current = null;
+    showView("scan");
+    $("sheetBody").innerHTML =
+      '<div class="scan-wrap">' +
+        '<div class="scan-box"><video id="scanVideo" playsinline muted autoplay></video><div class="scan-frame"><i></i></div></div>' +
+        '<div class="scan-msg" id="scanMsg" role="status" aria-live="polite">Starting camera…</div>' +
+        '<p class="scan-sub" id="scanSub"></p>' +
+        '<form class="scan-manual" id="scanManual"><div class="field"><label for="scanCode">Or type the barcode number</label>' +
+          '<input id="scanCode" type="text" inputmode="numeric" autocomplete="off" placeholder="Numbers under the bars"></div>' +
+          '<button class="btn-sm" type="submit">Look up</button></form>' +
+      '</div>';
+    $("scanManual").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var c = $("scanCode").value.replace(/\D/g, "");
+      if (c.length < 8) { scanMessage("That number is too short", "Barcodes have 8 to 14 digits."); return; }
+      $("scanCode").blur(); onBarcode(c);
+    });
+    startCamera();
+  }
+  function startCamera() {
+    if (view !== "scan") return;
+    leaveScan();
+    var video = $("scanVideo"); if (!video) return;
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      scanMessage("The camera isn't available here", "Type the barcode number below instead."); return;
+    }
+    function go() {
+      scanLoading = false;
+      if (view !== "scan") return;
+      scanMessage("Point the camera at the barcode", "Hold steady about a hand's width away. Good light helps.");
+      stopScan = window.ScanSDK.start(video, onBarcode, function (err) {
+        var n = err && err.name;
+        if (n === "NotAllowedError" || n === "SecurityError") scanMessage("The camera is blocked", "Allow camera access in your phone's settings for this app, or type the barcode number below.");
+        else if (n === "NotFoundError" || n === "OverconstrainedError") scanMessage("No camera found", "Type the barcode number below instead.");
+        else scanMessage("The camera didn't start", "Close other apps using the camera and try again, or type the number below.");
+      });
+    }
+    if (window.ScanSDK) { go(); return; }
+    if (scanLoading) return;
+    scanLoading = true;
+    var sc = document.createElement("script");
+    sc.src = "scan.js";
+    sc.onload = go;
+    sc.onerror = function () { scanLoading = false; scanMessage("Couldn't load the scanner", "Check your internet, or type the barcode number below."); };
+    document.head.appendChild(sc);
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (view !== "scan") return;
+    if (document.hidden) { if (stopScan) { leaveScan(); } }
+    else if (!scanBusy && !stopScan && $("scanVideo")) startCamera();
+  });
+
+  function onBarcode(raw) {
+    if (scanBusy) return;
+    var code = String(raw).replace(/\D/g, "");
+    if (code.length < 8) return;
+    scanBusy = true;
+    if (stopScan) { try { stopScan(); } catch (e) {} stopScan = null; }
+    if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) {}
+    scanMessage("Found " + code, "Looking it up…");
+    lookupBarcode(code).then(function (found) {
+      if (view !== "scan") return;
+      scanBusy = false;
+      if (!found) showScanMissing(code, null);
+      else if (found.kind === "usda") { var it = found.item; it.__barcode = code; openDetailFromSearch(it); }
+      else openOffProduct(found.product, code);
+    }, function (err) {
+      if (view !== "scan") return;
+      scanBusy = false; showScanMissing(code, err || {});
+    });
+  }
+
+  function stripZeros(c) { return String(c).replace(/^0+/, ""); }
+  function usdaByCode(code) {
+    return fetchJSON(searchUrl(code, "Branded", 5)).then(function (d) {
+      var hit = (d.foods || []).find(function (f) { return f.gtinUpc && stripZeros(f.gtinUpc) === stripZeros(code); });
+      return hit ? { kind: "usda", item: hit } : null;
+    });
+  }
+  var OFF_FIELDS = "code,product_name,brands,nutriments,serving_size,serving_quantity,quantity,product_quantity";
+  function offByCode(code) {
+    return fetchJSON("https://world.openfoodfacts.org/api/v2/product/" + encodeURIComponent(code) + ".json?fields=" + OFF_FIELDS).then(function (d) {
+      return d && d.status === 1 && d.product ? { kind: "off", product: d.product } : null;
+    });
+  }
+  // USDA first (same data as the rest of the app), then Open Food Facts. A failed lookup is reported, not hidden.
+  function lookupBarcode(code) {
+    var failed = null;
+    function safe(p) { return p.catch(function (e) { failed = failed || e || {}; return null; }); }
+    var variants = [code];
+    if (code.length === 13 && code[0] === "0") variants.push(code.slice(1));
+    else if (code.length === 12) variants.push("0" + code);
+    return variants.reduce(function (p, c) {
+      return p.then(function (f) { return f || safe(usdaByCode(c)); });
+    }, Promise.resolve(null)).then(function (f) {
+      return f || safe(offByCode(code));
+    }).then(function (f) {
+      if (!f && failed) throw failed;
+      return f;
+    });
+  }
+
+  function offNum(n, k) {
+    var v = n[k];
+    if (typeof v === "string" && v.trim() !== "") v = +v;
+    return typeof v === "number" && isFinite(v) && v >= 0 ? v : null;
+  }
+  function per100FromOff(n) {
+    n = n || {};
+    var map = {}, kcal = offNum(n, "energy-kcal_100g");
+    if (kcal == null) { var kj = offNum(n, "energy_100g"); if (kj != null) kcal = kj / 4.184; }
+    var pairs = [[NID.kcal, kcal], [NID.protein, offNum(n, "proteins_100g")], [NID.carbs, offNum(n, "carbohydrates_100g")], [NID.fat, offNum(n, "fat_100g")], [NID.fiber, offNum(n, "fiber_100g")]];
+    pairs.forEach(function (x) { if (x[1] != null) map[x[0]] = x[1]; });
+    return per100FromMap(map);
+  }
+  window.__nutritionTest.per100FromOff = per100FromOff;
+  function openOffProduct(prod, code) {
+    var per100 = per100FromOff(prod.nutriments);
+    if (per100.kcal == null && per100.protein == null && per100.carbs == null && per100.fat == null) { showScanMissing(code, null, "nodata", prod); return; }
+    var sizeText = String(prod.serving_size || prod.quantity || "").toLowerCase();
+    var liquid = /\b(ml|cl|dl|l|fl\.? ?oz)\b/.test(sizeText);
+    var sq = parseFloat(prod.serving_quantity);
+    var units = [];
+    if (sq > 0) units.push({ label: "serving (" + r1(sq) + (liquid ? " ml" : " g") + ")", grams: sq });
+    if (liquid) units.push({ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 });
+    else units.push({ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 });
+    current = {
+      fdcId: null, name: niceName(prod.product_name || "Scanned food"), brand: niceName(String(prod.brands || "").split(",")[0]),
+      dataType: "Open Food Facts", per100: per100, nutrients: {}, units: units, unitIndex: 0, qty: 100, loading: false,
+      barcode: code, scanDefault: { amount: sq > 0 ? sq : 100 }
+    };
+    applyScanDefault();
+    showView("detail"); renderDetail(); $("sheetBody").scrollTop = 0;
+  }
+
+  function showScanMissing(code, err, kind, prod) {
+    var title, text;
+    if (kind === "nodata") { title = "No nutrition facts for this product"; text = "It's in the database as " + niceName(prod.product_name || "a product") + ", but nobody has entered its nutrition. Add it as a custom food from the label."; }
+    else if (err) { title = "Couldn't look it up"; text = "Check your internet and try again. If it keeps happening, add it as a custom food."; }
+    else { title = "Barcode " + code + " not found"; text = "It isn't in the food databases yet. Scan again, search by name, or add it as a custom food from the label."; }
+    $("sheetBody").innerHTML =
+      '<div class="scan-wrap"><div class="state" style="padding-top:12px"><strong>' + esc(title) + '</strong>' + esc(text) + '</div>' +
+      '<div class="detail-foot" style="display:flex;flex-direction:column;gap:10px;margin-top:14px">' +
+      '<button class="primary" type="button" id="scanAgain">Scan again</button>' +
+      '<button class="btn-outline" type="button" id="scanCustom">Add as custom food</button></div></div>';
+    $("scanAgain").addEventListener("click", openScan);
+    $("scanCustom").addEventListener("click", openCustom);
   }
 
   // ---------- Time field (shared by detail and custom) ----------
@@ -1393,6 +1581,7 @@ select.in { padding-right: 30px;
   }
 
   function backToSearch() {
+    leaveScan();
     if (detailCtrl) detailCtrl.abort();
     current = null;
     showView("search");
@@ -1431,6 +1620,7 @@ select.in { padding-right: 30px;
     $("sheet").style.transform = ""; $("scrim").style.opacity = "";
     if (searchCtrl) searchCtrl.abort();
     if (detailCtrl) detailCtrl.abort();
+    leaveScan();
     $("search").blur();
     $("scrim").classList.remove("show"); $("sheet").classList.remove("show");
     unlockPage();
@@ -1504,7 +1694,8 @@ select.in { padding-right: 30px;
     sheetKind = b.dataset.kind; renderKind();
   });
   $("sheetBody").addEventListener("click", function (ev) {
-    var b = ev.target.closest("[data-pick],[data-recent],[data-custom],[data-more],[data-packaged]"); if (!b) return;
+    var b = ev.target.closest("[data-pick],[data-recent],[data-custom],[data-more],[data-packaged],[data-scan]"); if (!b) return;
+    if (b.dataset.scan) { $("search").blur(); openScan(); return; }
     if (b.dataset.custom) { $("search").blur(); openCustom(); return; }
     if (b.dataset.more) { results.more = true; renderSearchBody(); return; }
     if (b.dataset.packaged) { runPackagedSearch(); return; }
