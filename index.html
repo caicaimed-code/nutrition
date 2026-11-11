@@ -622,7 +622,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 24</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 25</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1253,7 +1253,7 @@ select.in { padding-right: 30px;
 
       var need = learnSec("How much protein you need", "Your daily target and per-meal amount",
         '<ul>' +
-        '<li><b>Daily:</b> this app uses 0.8 g per pound of body weight' + (w ? ' (' + fmt(0.8 * w) + ' g for you)' : '') + '. Research for building and keeping muscle supports 1.6 to 2.2 g per kg, which is 0.7 to 1.0 g per pound.</li>' +
+        '<li><b>Daily:</b> this app uses ' + proteinPerLb(state.settings) + ' g per pound of body weight' + (w ? ' (' + fmt(proteinPerLb(state.settings) * w) + ' g for you)' : '') + '. On average, extra protein stops adding muscle at about 0.7 g per pound (1.6 g per kg). Some people keep benefiting up to about 1 g per pound (2.2 g per kg), so 1 g covers nearly everyone. No study shows more muscle above that; the extra is burned for energy. Change it in Plan, Macro targets.</li>' +
         '<li><b>Per meal:</b> 25 to 40 g of quality protein, 3 to 5 times a day. That hits the leucine start button each time.</li>' +
         '<li><b>Around training:</b> a protein meal within 1 to 2 hours before and after lifting.</li>' +
         '</ul>' +
@@ -2619,8 +2619,8 @@ select.in { padding-right: 30px;
           '<button type="button" data-prot="0.8" aria-pressed="' + (per === 0.8) + '">Standard · 0.8 g/lb</button>' +
           '<button type="button" data-prot="1" aria-pressed="' + (per === 1) + '">Max muscle · 1 g/lb</button></div>' +
         '<p class="note">' + (per === 1
-          ? 'Protein is 1 g per pound of body weight, the top of the range research supports. Most people get nearly all the muscle benefit by about 0.7 g per pound; going to 1 g covers the people who need more.'
-          : 'Protein is 0.8 g per pound of body weight. Research finds most of the muscle benefit by about 0.7 g per pound; pick Max muscle to go to the top of the supported range.') +
+          ? 'Protein is 1 g per pound of body weight: the top of the range research supports, so it covers nearly everyone, including people who need more than average. No study shows more muscle above 1 g per pound.'
+          : 'Protein is 0.8 g per pound of body weight. On average the muscle benefit stops at about 0.7 g per pound, so this covers most people. Some need up to 1 g per pound; pick Max muscle to be sure.') +
         ' Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest, so more protein means fewer carbs.</p></section>';
     }
 
