@@ -413,6 +413,10 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .w-hero .big small { font-family: var(--font-body); font-size: 16px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
 .w-hero .sub { color: var(--muted); font-size: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.suggest { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 10px; }
+.suggest .sg { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 8px 14px; font-size: 15px; color: var(--muted); min-height: 38px; }
+.suggest .sg b { color: var(--fg); font-weight: 700; }
+.suggest .sg:active { background: var(--line); }
 .stat-chip { background: var(--surface-2); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
 .stat-chip.toward { color: var(--good); }
 .stat-chip span { color: var(--muted); font-weight: 500; }
@@ -594,7 +598,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 17</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 18</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1245,10 +1249,34 @@ select.in { padding-right: 30px;
       '</button></li>';
   }
 
+  // Words offered while typing. Just search words, never nutrition numbers. Most common first.
+  var SUGGEST_WORDS = ("chicken breast,chicken thigh,chicken wings,ground turkey,turkey breast,ground beef,steak,sirloin,ribeye,pork chop,bacon,ham,sausage,salmon,tuna,shrimp,tilapia,cod,sardines,egg,egg white,scrambled eggs,tofu,tempeh,edamame,greek yogurt,yogurt,cottage cheese,milk,whole milk,skim milk,almond milk,soy milk,oat milk,cheese,cheddar cheese,mozzarella,parmesan,cream cheese,butter,sour cream,heavy cream,ice cream,rice,white rice,brown rice,oatmeal,oats,pasta,spaghetti,bread,whole wheat bread,bagel,tortilla,potato,sweet potato,quinoa,couscous,cereal,pancake,waffle,cracker,popcorn,corn,black beans,kidney beans,pinto beans,chickpeas,lentils,peas,green beans,lettuce,romaine lettuce,spinach,kale,broccoli,cauliflower,carrot,celery,cucumber,tomato,onion,garlic,bell pepper,zucchini,mushroom,asparagus,cabbage,brussels sprouts,avocado,eggplant,beet,pumpkin,squash,radish,apple,banana,orange,strawberry,blueberry,raspberry,blackberry,grapes,watermelon,cantaloupe,pineapple,mango,peach,pear,plum,cherry,kiwi,lemon,lime,grapefruit,pomegranate,papaya,dates,raisins,coconut,fig,apricot,cranberry,almonds,peanuts,peanut butter,almond butter,walnuts,cashews,pistachios,pecans,sunflower seeds,chia seeds,flaxseed,olive oil,coconut oil,hummus,honey,sugar,maple syrup,jam,chocolate,dark chocolate,coffee,orange juice,apple juice,soda,beer,wine,pizza,hamburger,french fries,hot dog,taco,burrito,sandwich,soup,salad,mayonnaise,ketchup,mustard,soy sauce,salsa,ranch dressing,cookie,cake,donut,potato chips,jerky,protein bar,granola,pretzel,tortilla chips,turkey bacon,canned tuna,smoked salmon,lamb,duck,venison,crab,lobster,scallops,oysters,anchovies,whey").split(",");
+  function suggestionsFor(q) {
+    var t = q.toLowerCase().trim();
+    if (t.length < 2) return [];
+    var starts = [], inside = [];
+    SUGGEST_WORDS.forEach(function (w) {
+      if (w === t) return;
+      if (w.indexOf(t) === 0) starts.push(w);
+      else if (w.split(" ").slice(1).some(function (x) { return x.indexOf(t) === 0; }) || w.indexOf(" " + t) >= 0) inside.push(w);
+    });
+    return starts.concat(inside).slice(0, 6);
+  }
+  window.__nutritionTest.suggestionsFor = suggestionsFor;
+  function suggestHtml(q) {
+    var list = suggestionsFor(q); if (!list.length) return "";
+    var n = q.trim().length;
+    return '<div class="suggest" role="listbox" aria-label="Did you mean">' + list.map(function (w) {
+      var i = w.indexOf(q.trim().toLowerCase());
+      var label = i >= 0 ? esc(w.slice(0, i)) + '<b>' + esc(w.slice(i, i + n)) + '</b>' + esc(w.slice(i + n)) : esc(w);
+      return '<button class="sg" type="button" role="option" data-suggest="' + esc(w) + '">' + label + '</button>';
+    }).join("") + '</div>';
+  }
+
   function renderSearchBody() {
     var q = $("search").value.trim();
     $("clearBtn").hidden = !q;
-    var html = '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
+    var html = suggestHtml(q) + '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
       '<span class="t"><div class="n">Scan barcode</div><div class="m">Packaged foods in one step</div></span><span class="add" aria-hidden="true">›</span></button>' +
       '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
       '<span class="t"><div class="n">Custom food</div><div class="m">Type your own calories and macros</div></span><span class="add" aria-hidden="true">›</span></button>';
@@ -1329,7 +1357,7 @@ select.in { padding-right: 30px;
   function apiError(status) {
     if (status === 429) return { title: "Too many searches right now", text: "The food database limits searches per hour. Try again in a little while." };
     if (status === 403 || status === 401) return { title: "Food search isn't connected", text: "The food database refused the request. Try again later." };
-    return { title: "Search didn't work", text: "The food database had a problem. Try again in a moment." };
+    return { title: "Search didn't work", text: "The food database had a problem (error " + status + "). Try again in a moment." };
   }
 
   function fetchJSON(url, signal) {
@@ -1344,6 +1372,27 @@ select.in { padding-right: 30px;
       "&dataType=" + encodeURIComponent(types) + "&pageSize=" + size;
   }
 
+  // The Survey (FNDDS) part of the database sometimes refuses a word (potato, carrot) while the rest answers fine.
+  // So the two parts are asked separately and a failure in one doesn't hide the other.
+  function fetchRetry(url, signal) {
+    return fetchJSON(url, signal).catch(function (err) {
+      var transient = err && err.name !== "AbortError" && (!err.status || err.status >= 500);
+      if (!transient) throw err;
+      return new Promise(function (r) { setTimeout(r, 700); }).then(function () { return fetchJSON(url, signal); });
+    });
+  }
+  function searchFoods(q, signal) {
+    function part(types) {
+      return fetchRetry(searchUrl(q, types, 15), signal).then(function (d) { return { ok: true, foods: d.foods || [] }; },
+        function (err) { if (err && err.name === "AbortError") throw err; return { ok: false, err: err }; });
+    }
+    return Promise.all([part("Foundation,SR Legacy"), part("Survey (FNDDS)")]).then(function (r) {
+      if (!r[0].ok && !r[1].ok) throw r[0].err;
+      return (r[0].foods || []).concat(r[1].foods || []);
+    });
+  }
+  window.__nutritionTest.searchFoods = searchFoods;
+
   function runSearch(q) {
     if (searchCtrl) searchCtrl.abort();
     searchCtrl = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -1354,9 +1403,9 @@ select.in { padding-right: 30px;
       results = { query: q, generic: [], branded: [], error: { title: "No internet connection", text: "Food search needs internet. Recent foods still work offline." } };
       renderSearchBody(); return;
     }
-    fetchJSON(searchUrl(q, "Foundation,SR Legacy,Survey (FNDDS)", 30), signal).then(function (data) {
+    searchFoods(q, signal).then(function (foods) {
       if ($("search").value.trim() !== q) return;
-      results = { query: q, generic: rankFoods(data.foods || [], q), branded: [], more: false, packaged: false };
+      results = { query: q, generic: rankFoods(foods, q), branded: [], more: false, packaged: false };
       renderSearchBody();
     }, function (err) {
       if (err && err.name === "AbortError") return;
@@ -1388,6 +1437,11 @@ select.in { padding-right: 30px;
   });
   $("search").addEventListener("keydown", function (e) {
     if (e.key === "Enter") { clearTimeout(searchTimer); var q = $("search").value.trim(); if (q.length >= 2) runSearch(q); $("search").blur(); }
+  });
+  $("sheetBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-suggest]"); if (!b) return;
+    var w = b.dataset.suggest;
+    clearTimeout(searchTimer); $("search").value = w; $("search").blur(); runSearch(w);
   });
   $("clearBtn").addEventListener("click", function () { $("search").value = ""; results = null; renderSearchBody(); $("search").focus(); });
 
