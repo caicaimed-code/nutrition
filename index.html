@@ -525,7 +525,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 10</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 11</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1874,7 +1874,14 @@ select.in { padding-right: 30px;
 
   // ---------- Cloud backup ----------
   // Firebase project settings. These are safe to be public: the database rules decide who can read or write.
-  var FIREBASE_CONFIG = window.__FIREBASE_CONFIG_OVERRIDE || null;
+  var FIREBASE_CONFIG = window.__FIREBASE_CONFIG_OVERRIDE || {
+    apiKey: "AIzaSyBV9Po4GCJ_puQwzxif-RlcLYID_m3Qr_g",
+    authDomain: "dads-nutrition.firebaseapp.com",
+    projectId: "dads-nutrition",
+    storageBucket: "dads-nutrition.firebasestorage.app",
+    messagingSenderId: "17894013219",
+    appId: "1:17894013219:web:543c9d6377f629b2877496"
+  };
   var SYNC_KEY = "dads-nutrition-sync";
   var sync = (function () { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch (e) { return {}; } })();
   var cloud = null, cloudUser = null, cloudState = "loading", cloudError = "", cloudBusy = false, cloudAgain = null;
