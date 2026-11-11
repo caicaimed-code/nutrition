@@ -451,7 +451,20 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .pace[aria-checked="true"] { border-color: var(--ink); background: var(--surface-2); }
 .pace .radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--muted); display: grid; place-items: center; }
 .pace[aria-checked="true"] .radio { border-color: var(--ink); }
-.pace[aria-checked="true"] .radio::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); }
+.pace .radio { transition: border-color .18s ease; }
+.pace .radio::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); transform: scale(0); transition: transform .22s cubic-bezier(.3,1.6,.5,1); }
+.pace[aria-checked="true"] .radio::after { transform: scale(1); }
+.pace { transition: border-color .18s ease, background-color .18s ease; }
+.plan-box { width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; padding: 16px 18px; }
+.plan-box .t { flex: 1; min-width: 0; }
+.plan-box b { display: block; font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.plan-box small { display: block; color: var(--muted); font-size: 14px; margin-top: 3px; line-height: 1.35; }
+.plan-box small.need { color: var(--warn); }
+.plan-box .chev { color: var(--muted); font-size: 22px; }
+.plan-box .mini { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 14px; }
+.plan-box .mini span { display: inline-flex; align-items: center; gap: 5px; }
+.plan-box .mini .num { font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .pace .radio::after, .pace, .pace .radio { transition: none; } }
 .pace .t b { display: block; font-weight: 600; }
 .pace .t small { color: var(--muted); font-size: 12.5px; }
 .pace .t small.warn { color: var(--warn); }
@@ -581,7 +594,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 16</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 17</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -608,9 +621,10 @@ select.in { padding-right: 30px;
 </div>
 
 <div class="app cal-page" id="planPage" hidden>
-  <h1 class="page-title">Plan</h1>
+  <div class="learn-top" id="planTop" hidden><button class="learn-back" type="button" id="planBack">‹ Plan</button></div>
+  <h1 class="page-title" id="planTitle">Plan</h1>
   <div id="planBody"></div>
-  <div id="backupBody" class="cal-page" style="margin-top:14px"></div>
+  <div id="backupBody" class="cal-page" hidden></div>
 </div>
 
 <div class="app cal-page" id="learnPage" hidden>
@@ -1104,7 +1118,7 @@ select.in { padding-right: 30px;
         '</ul>' +
         '<div class="callout"><b>More leucine isn\'t always better.</b> A small whey dose with extra leucine matched a full dose at rest, but only the full dose kept building going after exercise. Leucine starts the build; you still need all 9 bricks to finish it.</div>' +
         '<p><b>You can\'t keep it on all day.</b> Building rises after a meal, then shuts off after a few hours even if amino acids stay high (the "muscle full" effect). That\'s why 3 to 5 protein meals beat all-day grazing.</p>' +
-        '<p class="cite">Norton & Layman 2006; Churchward-Venne 2012; Trommelen 2019.</p><span class="ev">Evidence: strong</span>', true);
+        '<p class="cite">Norton & Layman 2006; Churchward-Venne 2012; Trommelen 2019.</p><span class="ev">Evidence: strong</span>');
 
       var tiers = learnSec("Protein tier list", "Which foods give you the most and best protein",
         TIERS.map(function (t) {
@@ -1995,7 +2009,7 @@ select.in { padding-right: 30px;
     });
     if (t === "cal") { calDate = selectedDate; renderCalendar(); }
     else if (t === "weight") renderWeight();
-    else if (t === "plan") { renderPlan(); renderBackup(); }
+    else if (t === "plan") { planView = "home"; renderPlan(); renderBackup(); }
     else if (t === "learn") renderLearn();
     else render();
     window.scrollTo(0, 0);
@@ -2338,11 +2352,10 @@ select.in { padding-right: 30px;
     var top = '<section class="card plan-card">' +
       '<div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Daily calorie target</div>' +
       '<div class="target-big num">' + fmt(TARGETS.kcal) + '<small>kcal</small></div>' +
-      '<p class="note">' + (!c ? "This is a sample target. Enter your stats below to get your own." : !goal ? "This is a sample target. Pick your goal below to set your real one." : !hit ? "This is a sample target. Pick a pace below to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. " + goalNote[goal]) + '</p>' +
+      '<p class="note">' + (!c ? "This is a sample target. Add your stats to get your own." : !goal ? "This is a sample target. Pick your goal to set your real one." : !hit ? "This is a sample target. Pick a pace to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. " + goalNote[goal]) + '</p>' +
       '</section>';
 
-    var goals = '<div class="section-h"><h2>Your goal</h2>' + (goal ? '' : '<span>Pick one</span>') + '</div>' +
-      '<section class="card plan-card" role="radiogroup" aria-label="Goal">' + GOALS.map(function (g) {
+    var goals = '<section class="card plan-card" role="radiogroup" aria-label="Goal">' + GOALS.map(function (g) {
         return '<button class="pace" type="button" role="radio" data-goal="' + g.id + '" aria-checked="' + (goal === g.id) + '">' +
           '<span class="radio" aria-hidden="true"></span>' +
           '<span class="t"><b>' + g.label + '</b><small>' + g.desc + '</small></span><span></span></button>';
@@ -2364,16 +2377,14 @@ select.in { padding-right: 30px;
     }
     if (c) {
       var mt = hit ? TARGETS : macroTargets(Math.round(c.maint / 10) * 10, w);
-      macros = '<div class="section-h"><h2>Macro targets</h2><span>' + (hit ? "In use" : "Preview at maintenance") + '</span></div>' +
-        '<section class="card plan-card"><div class="macro-targets">' + MACROS.map(function (m) {
+      macros = '<section class="card plan-card"><p class="note" style="margin:0">' + (hit ? "In use for your goal." : "Preview at maintenance. Pick a goal to use your own.") + '</p><div class="macro-targets">' + MACROS.map(function (m) {
           return '<div><div class="v num">' + fmt(mt[m.key]) + '<span style="font-size:12px"> g</span></div><div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div></div>';
         }).join("") + '</div>' +
         '<p class="note">Protein is 0.8 g per pound of body weight, inside the range research supports for keeping and building muscle. Fat is 30% of calories, fiber is 14 g per 1,000 calories, and carbs fill the rest.</p></section>';
     }
 
     var ft = s.heightIn ? Math.floor(s.heightIn / 12) : null, inch = s.heightIn ? s.heightIn % 12 : 0;
-    var stats = '<div class="section-h"><h2>Your stats</h2><span>' + (missing.length ? "Needed for your target" : "Used for your targets") + '</span></div>' +
-      '<section class="card plan-card">' +
+    var stats = '<section class="card plan-card">' +
         (missing.length ? '<p class="note" style="font-size:14px;color:var(--fg)">Still needed: ' + missing.join(", ") + '.</p>' : '') +
         '<div class="form-grid">' +
         '<div class="full"><span class="lab">Sex</span><div class="seg" id="sexSeg" role="group" aria-label="Sex">' +
@@ -2395,19 +2406,61 @@ select.in { padding-right: 30px;
 
     var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Maintenance is estimated with the Mifflin-St Jeor formula times the activity level, and each pound a week is about 500 kcal a day below or above it. Bulk eats 10 to 20% above maintenance, the range research supports for gaining muscle; the faster paces add more fat. It is an estimate: watch the trend weight for 2 to 3 weeks and adjust if it moves faster or slower than planned. Check the target with your doctor before starting, especially with any health condition.</p></section>';
 
-    var html = top + goals + paces + macros + stats + how;
-    $("planBody").innerHTML = '<div class="cal-page">' + html + '</div>';
+    var html;
+    if (planView === "goal") html = top + goals + paces + (c ? '' : '<p class="note">Add your stats first to see the paces and your target.</p>');
+    else if (planView === "macros") html = (macros || '<section class="card plan-card"><p class="note">Add your stats and pick a goal to get your macro targets. These are samples for now.</p></section>') + how;
+    else if (planView === "stats") html = top + stats + how;
+    else if (planView === "backup") html = "";
+    else html = top + planBoxes(s, w, c, goal, hit, missing);
+    $("planBody").innerHTML = html ? '<div class="cal-page">' + html + '</div>' : '';
+    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup" };
+    $("planTitle").textContent = titles[planView];
+    $("planTop").hidden = planView === "home";
+    $("backupBody").hidden = planView !== "backup";
   }
+  var planView = "home";
+  function planBoxes(s, w, c, goal, hit, missing) {
+    var g = GOALS.find(function (x) { return x.id === goal; });
+    var p = hit && hit.pace.goal !== "maintain" ? hit.pace.label : "";
+    var goalSub = g ? g.label + (p ? " · " + p : "") : '<span class="need" style="color:var(--warn)">Not set. Tap to choose.</span>';
+    var act = ACTIVITY.find(function (a) { return a.id === s.activity; });
+    var statsSub = missing.length ? '<small class="need">Still needed: ' + missing.join(", ") + '</small>'
+      : '<small>' + (s.sex === "female" ? "Female" : "Male") + ' · ' + ageOn(s.birth) + ' yrs · ' + Math.floor(s.heightIn / 12) + ' ft ' + (s.heightIn % 12) + ' in · ' + fmtLb(w) + ' lb · ' + (act ? act.label : "") + '</small>';
+    var mini = '<div class="mini">' + MACROS.map(function (m) {
+      return '<span><span class="dot" style="--c:' + m.color + '"></span><span class="num">' + fmt(TARGETS[m.key]) + ' g</span> ' + m.label + '</span>';
+    }).join("") + '</div>';
+    function box(id, title, sub) {
+      return '<button class="card plan-box" type="button" data-pview="' + id + '"><span class="t"><b>' + title + '</b>' + sub + '</span><span class="chev" aria-hidden="true">›</span></button>';
+    }
+    return box("goal", "Your goal", '<small>' + goalSub + '</small>') +
+      box("macros", "Macro targets", '<small>' + (realTargets() ? "In use" : "Samples for now") + '</small>' + mini) +
+      box("stats", "Your stats", statsSub) +
+      box("backup", "Backup", '<small id="boxBackupSub">' + esc(backupSummary()) + '</small>');
+  }
+  function backupSummary() {
+    if (cloudState === "nocfg") return "Not set up";
+    if (!cloudUser) return "Off. Tap to sign in and back up your data.";
+    return (cloudState === "ok" ? "Backed up" : cloudState === "error" ? "Not backed up yet" : "Backing up…") + " · " + cloudUser.email;
+  }
+  function openPlanView(v) { planView = v; renderPlan(); renderBackup(); window.scrollTo(0, 0); }
+  $("planBack").addEventListener("click", function () { openPlanView("home"); });
 
-  var planTimer = null;
+  var planTimer = null, planAnim = false;
   function planChanged() {
     save(); applyTargets();
     // Redraw after the current tap or blur finishes, so a box isn't removed while it still has focus
     clearTimeout(planTimer);
-    planTimer = setTimeout(function () { if (currentTab === "plan") renderPlan(); }, 0);
+    var wait = planAnim ? 260 : 0; planAnim = false;
+    planTimer = setTimeout(function () { if (currentTab === "plan") renderPlan(); }, wait);
+  }
+  // Fill the tapped circle first, then redraw once the fill animation is done
+  function checkNow(b) {
+    Array.prototype.forEach.call(b.parentNode.querySelectorAll('[role="radio"]'), function (x) { x.setAttribute("aria-checked", x === b ? "true" : "false"); });
   }
   $("planBody").addEventListener("click", function (ev) {
     var b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.pview) { openPlanView(b.dataset.pview); return; }
+    if (b.dataset.goal || b.dataset.pace) { checkNow(b); planAnim = true; }
     if (b.dataset.goal) {
       var s = state.settings, g = b.dataset.goal;
       if (goalOf(s) === g) { if (!s.goal) { s.goal = g; save(); } return; }
@@ -2619,7 +2672,8 @@ select.in { padding-right: 30px;
   }
   function renderBackup() {
     var box = $("backupBody"); if (!box) return;
-    var h = '<div class="section-h"><h2>Backup</h2><span>' + (cloudUser ? "On" : cloudState === "nocfg" ? "Not set up" : "Off") + '</span></div><section class="card plan-card">';
+    if ($("boxBackupSub")) $("boxBackupSub").textContent = backupSummary();
+    var h = '<section class="card plan-card">';
     if (cloudState === "nocfg") {
       h += '<p class="note">Cloud backup isn\'t set up yet. Everything is saved on this phone only.</p>';
     } else if (!cloudUser) {
