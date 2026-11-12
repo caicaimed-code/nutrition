@@ -522,6 +522,26 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .pic-slider .divider::after { content: "⇆"; position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; background: #fff; color: #000; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .pic-slider .lbl { position: absolute; top: 8px; padding: 2px 8px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 600; }
 .pic-range { width: 100%; margin: 10px 0 0; accent-color: var(--fg); }
+/* Welcome + first-time setup */
+.welcome { position: fixed; inset: 0; z-index: 85; background: var(--bg); overflow-y: auto; display: flex; }
+.welcome[hidden] { display: none; }
+.w-in { margin: auto; width: 100%; max-width: 440px; padding: 40px 24px calc(32px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; text-align: center; }
+.w-emojis { font-size: 40px; letter-spacing: 6px; animation: wIn .6s cubic-bezier(.2,1.3,.4,1) both; }
+.w-in h1 { font-size: 34px; letter-spacing: -0.03em; margin: 4px 0 0; animation: wIn .6s .08s cubic-bezier(.2,1.3,.4,1) both; }
+.w-in .lead { color: var(--muted); font-size: 17px; line-height: 1.45; margin: 0; animation: wIn .6s .16s both; }
+.w-steps { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 10px; text-align: left; animation: wIn .6s .24s both; }
+.w-steps li { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 16px; background: var(--surface); }
+.w-steps .n { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: var(--on-ink); font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.w-steps b { display: block; } .w-steps small { color: var(--muted); }
+.w-in .btn-sm { width: 100%; height: 54px; font-size: 17px; }
+.w-in .link-btn { align-self: center; color: var(--muted); font-weight: 600; padding: 8px; }
+.w-mini { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; font-size: 15px; color: var(--muted); } .w-mini .num { color: var(--fg); font-weight: 700; }
+.w-target { font-size: 54px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.w-target small { font-size: 16px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+@keyframes wIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.setup-bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--surface); font-weight: 600; }
+.setup-bar .dots { display: flex; gap: 5px; margin-left: auto; } .setup-bar .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--track); } .setup-bar .dots i.on { background: var(--fg); }
+.setup-next { width: 100%; height: 54px; font-size: 17px; }
 .vh-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 
 /* Weight */
@@ -748,7 +768,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 40</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 41</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -829,6 +849,7 @@ select.in { padding-right: 30px;
 </section>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="welcome" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="wTitle"></div>
 <div class="celebrate" id="celebrate" aria-hidden="true"><div class="cb-badge"><span class="cb-ic" id="cbIc"></span><span class="cb-t" id="cbT"></span></div></div>
 
 <script>
@@ -3408,6 +3429,13 @@ select.in { padding-right: 30px;
     else if (planView === "settings") html = settingsView();
     else if (planView === "pics") html = '<div id="picsBody"></div>';
     else html = top + planBoxes(s, w, c, goal, hit, missing);
+    if (setupStep && planView === setupStep) {
+      var one = setupStep === "stats";
+      if (one) html = stats; // no sample target yet: it would only confuse a new person
+      html = '<div class="setup-bar"><span>Step ' + (one ? 1 : 2) + ' of 2 · ' + (one ? "About you" : "Your goal") + '</span><span class="dots"><i class="on"></i><i' + (one ? '' : ' class="on"') + '></i></span></div>' +
+        (one ? '<p class="note" style="margin:0">These set your calories and macros. Your weight can be updated any time in the Weight tab.</p>' : '<p class="note" style="margin:0">Pick what you want, then how fast.</p>') +
+        html + '<button class="btn-sm setup-next" type="button" id="setupNext">' + (one ? "Next: your goal ›" : "Finish") + '</button>';
+    }
     $("planBody").innerHTML = html ? '<div class="cal-page">' + html + '</div>' : '';
     if (planView === "pics") renderPics();
     var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import", creatine: "Creatine", settings: "Settings", pics: "Progress pics" };
@@ -3446,6 +3474,8 @@ select.in { padding-right: 30px;
   }
   function openPlanView(v) { planView = v; renderPlan(); renderBackup(); if (v === "backup") { renderImport(); renderGs(); } window.scrollTo(0, 0); }
   $("planBack").addEventListener("click", function () {
+    if (setupStep === "goal") { setupStep = "stats"; openPlanView("stats"); return; }
+    if (setupStep) { setupStep = null; }
     // Inside Progress pics, Back first returns to the photo grid
     if (planView === "pics" && picsMode !== "grid") { picsMode = "grid"; picsSel = []; picsNew = null; picsDelArm = false; renderPics(); window.scrollTo(0, 0); return; }
     openPlanView("home");
@@ -3468,6 +3498,7 @@ select.in { padding-right: 30px;
     if (b.dataset.pview) { openPlanView(b.dataset.pview); return; }
     if (b.dataset.themeOpt) { setTheme(b.dataset.themeOpt); renderPlan(); return; }
     if (b.dataset.sizeOpt !== undefined) { setTextSize(b.dataset.sizeOpt); renderPlan(); return; }
+    if (b.id === "setupNext") { setupNext(); return; }
     if (b.id === "exportBtn") { exportData(); return; }
     if (b.dataset.fbtype) { // keep what's typed: just move the highlight
       fbType = b.dataset.fbtype;
@@ -4334,7 +4365,73 @@ select.in { padding-right: 30px;
   document.addEventListener("visibilitychange", rollDay);
   setInterval(rollDay, 60000);
 
+  // ---------- Welcome + first-time setup ----------
+  // New people (no stats, nothing logged) see a welcome, then two guided steps (Your stats, Your goal)
+  // that use the normal Plan screens, then a "You're all set" screen with their target.
+  var WELCOMED_KEY = "dads-nutrition-welcomed";
+  var setupStep = null;
+  function isNewUser() {
+    var s = state.settings;
+    return !state.entries.length && !state.weights.length && !s.sex && !s.birth && !s.heightIn && s.startLb == null && !goalOf(s);
+  }
+  function welcomeSeen() { try { return !!localStorage.getItem(WELCOMED_KEY); } catch (e) { return false; } }
+  function markWelcomed() { try { localStorage.setItem(WELCOMED_KEY, "1"); } catch (e) {} }
+  function showWelcome() {
+    var w = $("welcome");
+    w.innerHTML = '<div class="w-in">' +
+      '<div class="w-emojis" aria-hidden="true">🥩🍞🥑🥦</div>' +
+      '<h1 id="wTitle">Welcome</h1>' +
+      '<p class="lead">Let\'s get you started so you can reach your goal. It takes about a minute.</p>' +
+      '<ol class="w-steps">' +
+        '<li><span class="n">1</span><span><b>About you</b><small>Sex, age, height, weight and how active you are</small></span></li>' +
+        '<li><span class="n">2</span><span><b>Your goal</b><small>Lose fat, stay the same, or build muscle</small></span></li>' +
+        '<li><span class="n">✓</span><span><b>Your daily targets</b><small>Calories, protein, carbs, fat and fiber, made for you</small></span></li>' +
+      '</ol>' +
+      '<button class="btn-sm" type="button" id="wStart">Let\'s get started</button>' +
+      '<button class="link-btn" type="button" id="wSignin">Already use the app? Sign in to bring your data</button>' +
+      '<button class="link-btn" type="button" id="wLater">I\'ll do it later</button>' +
+      '</div>';
+    w.hidden = false;
+  }
+  function showAllSet() {
+    var w = $("welcome");
+    w.innerHTML = '<div class="w-in">' +
+      '<div class="w-emojis" aria-hidden="true">🎯</div>' +
+      '<h1 id="wTitle">You\'re all set</h1>' +
+      '<p class="lead">Your daily target</p>' +
+      '<div class="w-target num">' + fmt(TARGETS.kcal) + '<small>kcal</small></div>' +
+      '<div class="w-mini">' + MACROS.map(function (m) { return '<span>' + m.emoji + ' <span class="num">' + fmt(TARGETS[m.key]) + ' g</span> ' + m.label + '</span>'; }).join("") + '</div>' +
+      '<p class="lead" style="font-size:15px">Log what you eat with <b>+ Log food</b>. Your targets live in the Plan tab, where you can change them any time.</p>' +
+      '<button class="btn-sm" type="button" id="wDone">Start logging</button>' +
+      '<button class="link-btn" type="button" id="wBackup">Back up my data (recommended)</button>' +
+      '</div>';
+    w.hidden = false;
+  }
+  function startSetup() {
+    $("welcome").hidden = true; markWelcomed();
+    setupStep = "stats"; showTab("plan"); openPlanView("stats");
+  }
+  function setupNext() {
+    if (setupStep === "stats") {
+      var miss = statsMissing(state.settings, currentWeight());
+      if (miss.length) { toast("Still needed: " + miss.join(", ")); return; }
+      setupStep = "goal"; openPlanView("goal"); return;
+    }
+    if (!realTargets()) { toast(goalOf(state.settings) ? "Pick a pace first" : "Pick a goal first"); return; }
+    setupStep = null; showAllSet();
+  }
+  $("welcome").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    if (b.id === "wStart") startSetup();
+    else if (b.id === "wLater") { $("welcome").hidden = true; markWelcomed(); }
+    else if (b.id === "wSignin") { $("welcome").hidden = true; markWelcomed(); showTab("plan"); openPlanView("backup"); }
+    else if (b.id === "wDone") { $("welcome").hidden = true; showTab("day"); celebrate("✓", "Ready to go!", "var(--good)"); }
+    else if (b.id === "wBackup") { $("welcome").hidden = true; showTab("plan"); openPlanView("backup"); }
+  });
+  window.__nutritionTest.showWelcome = showWelcome;
+
   render();
+  if (isNewUser() && !welcomeSeen()) showWelcome();
 })();
 </script>
 <script>
