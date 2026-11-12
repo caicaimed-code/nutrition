@@ -106,8 +106,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ring-wrap { position: relative; width: 200px; max-width: 100%; aspect-ratio: 1; }
 .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring-track { fill: none; stroke: var(--track); stroke-width: 11; }
-.ring-fill { fill: none; stroke: var(--ink); stroke-width: 11; stroke-linecap: round; transition: stroke-dashoffset .5s ease, stroke .3s; }
+.ring-fill { fill: none; stroke: var(--ink); stroke-width: 11; stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1), stroke .4s; }
 .ring-fill.over { stroke: var(--warn); }
+.ring-fill.on { stroke: var(--good); }
 .ring-fill.zero { stroke-linecap: butt; }
 .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .ring-center .big { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
@@ -131,7 +132,22 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .macro .amt { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .macro .amt small { font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
 .bar { height: 7px; border-radius: 999px; background: var(--track); overflow: hidden; }
-.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--c); transition: width .5s ease; }
+.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--c); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+.streak { font-size: 13px; font-weight: 600; color: var(--warn); margin-top: 2px; }
+.pbadge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: var(--protein); background: color-mix(in srgb, var(--protein) 15%, transparent); }
+.again-btn { color: var(--fg); font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 12px; background: var(--track); border: 1.5px solid var(--line); }
+/* Celebration pop (day on target, protein goal hit) */
+.celebrate { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; pointer-events: none; visibility: hidden; }
+.celebrate.show { visibility: visible; }
+.cb-badge { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 30px; border-radius: 28px; background: var(--surface); box-shadow: 0 20px 60px rgba(0,0,0,.35); opacity: 0; transform: scale(.6); }
+.celebrate.show .cb-badge { animation: cbPop 1.7s cubic-bezier(.2,1.4,.4,1) forwards; }
+.cb-ic { position: relative; width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; color: #fff; background: var(--cb, var(--good)); }
+.cb-ic::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--cb, var(--good)); opacity: 0; }
+.celebrate.show .cb-ic::after { animation: cbRing 1s ease-out .15s; }
+.cb-t { font-weight: 700; font-size: 17px; }
+@keyframes cbPop { 0% { opacity: 0; transform: scale(.6); } 18% { opacity: 1; transform: scale(1.04); } 28% { transform: scale(1); } 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.96); } }
+@keyframes cbRing { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.9); } }
+@media (prefers-reduced-motion: reduce) { .ring-fill, .bar i { transition: none; } .celebrate.show .cb-badge { animation-duration: .01s; opacity: 1; transform: none; } }
 .macro .left { font-size: 12px; color: var(--muted); }
 .macro .left.over { color: var(--warn); font-weight: 600; }
 
@@ -200,7 +216,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .log-card { padding: 2px 0; }
 .log-card .items { padding: 0; }
 .log-card .item:first-child { border-top: 0; }
-.when { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.when { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
 .tag { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
 .tag.meal { background: var(--ink); color: var(--on-ink); }
 .tag.snack { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
@@ -684,6 +700,7 @@ select.in { padding-right: 30px;
     <div>
       <h1 id="dayTitle">Today</h1>
       <div class="date" id="date"></div>
+      <div class="streak" id="streak" hidden></div>
       <button class="today-link" type="button" id="todayLink" hidden>Back to today</button>
     </div>
     <div class="top-nav">
@@ -718,7 +735,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 38</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 39</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -799,6 +816,7 @@ select.in { padding-right: 30px;
 </section>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="celebrate" id="celebrate" aria-hidden="true"><div class="cb-badge"><span class="cb-ic" id="cbIc"></span><span class="cb-t" id="cbT"></span></div></div>
 
 <script>
 (function () {
@@ -1096,6 +1114,50 @@ select.in { padding-right: 30px;
   var favEdit = false;       // Favorites list in remove mode
   var CIRC = 2 * Math.PI * 52;
   $("ring").style.strokeDasharray = CIRC.toFixed(2);
+  $("ring").style.strokeDashoffset = CIRC.toFixed(2);
+  var ringReady = false, lastBars = {}, lastProtein = {};
+
+  // ---------- Little celebrations ----------
+  var cbTimer;
+  function celebrate(icon, text, color) {
+    var el = $("celebrate");
+    $("cbIc").textContent = icon; $("cbT").textContent = text;
+    el.style.setProperty("--cb", color || "var(--good)");
+    el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+    if (navigator.vibrate) try { navigator.vibrate(25); } catch (e) {}
+    clearTimeout(cbTimer); cbTimer = setTimeout(function () { el.classList.remove("show"); }, 1800);
+  }
+  window.__nutritionTest.celebrate = celebrate;
+
+  // ---------- Logging streak: days in a row with food logged, ending today (or yesterday if today is empty so far) ----------
+  function logStreak() {
+    var has = {};
+    state.entries.forEach(function (e) { has[e.date] = 1; });
+    var k = dayKey(), n = 0;
+    if (!has[k]) k = addDays(k, -1);
+    while (has[k] && n < 3650) { n++; k = addDays(k, -1); }
+    return n;
+  }
+  function renderStreak(isToday) {
+    var n = isToday ? logStreak() : 0, el = $("streak");
+    el.hidden = n < 2;
+    if (n >= 2) el.textContent = "🔥 " + n + "-day logging streak";
+  }
+  window.__nutritionTest.logStreak = logStreak;
+
+  // ---------- Protein-rich meals ----------
+  // About 0.4 g of protein per kg of body weight in one meal (Schoenfeld & Aragon 2018), at least 20 g; 30 g if no weight yet.
+  function proteinMealMin() {
+    var lb = currentWeight();
+    return lb ? Math.max(20, Math.round(0.4 * lb * 0.453592)) : 30;
+  }
+  function proteinBadge(items) {
+    var p = macroSum(items, "protein");
+    return p != null && p >= proteinMealMin() ? '<span class="pbadge" title="At least ' + proteinMealMin() + ' g protein">🥩 Protein-rich</span>' : '';
+  }
+  function againBox(key) {
+    return '<div class="edit-row"><button class="again-btn" type="button" data-again="' + esc(key) + '">↻ ' + (selectedDate === dayKey() ? "Log again" : "Log again today") + '</button></div>';
+  }
 
   function render() {
     var list = entriesFor(selectedDate);
@@ -1112,12 +1174,22 @@ select.in { padding-right: 30px;
     $("targetNote").textContent = real ? "Targets come from the Plan tab." : "Targets are samples until you enter your stats and pick a goal in Plan.";
     $("nextDay").disabled = isToday;
     renderComplete();
-    var ring = $("ring");
-    ring.style.strokeDashoffset = (CIRC * (1 - Math.min(pct, 1))).toFixed(2);
-    ring.classList.toggle("over", left < 0);
+    renderStreak(isToday);
+    var ring = $("ring"), off = (CIRC * (1 - Math.min(pct, 1))).toFixed(2);
+    // On target (within the cushion, graded like the calendar) the ring turns green
+    var onTarget = t.kcal > 0 && t.kcal >= TARGETS.kcal - cushion() && statusFor(t.kcal, TARGETS.kcal, true, true) === "good";
+    if (!ringReady) { // first paint: fill up from empty
+      ringReady = true; ring.style.strokeDashoffset = CIRC.toFixed(2);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { ring.style.strokeDashoffset = off; }); });
+    } else ring.style.strokeDashoffset = off;
+    ring.classList.toggle("on", onTarget);
+    ring.classList.toggle("over", left < 0 && !onTarget);
     ring.classList.toggle("zero", t.kcal === 0);
     $("calLeft").textContent = fmt(Math.abs(left));
-    $("calLeft").classList.toggle("over", left < 0);
+    $("calLeft").classList.toggle("over", left < 0 && !onTarget);
+    // Protein goal reached just now (only when watching today, with real targets)
+    if (lastProtein.date === selectedDate && isToday && real && lastProtein.v < TARGETS.protein && t.protein >= TARGETS.protein) celebrate("🥩", "Protein goal hit!", "var(--protein)");
+    lastProtein = { date: selectedDate, v: t.protein };
     $("calLeftLbl").textContent = left < 0 ? "kcal over" : "kcal left";
     $("calEaten").textContent = fmt(t.kcal);
     $("calTarget").textContent = fmt(TARGETS.kcal);
@@ -1128,10 +1200,15 @@ select.in { padding-right: 30px;
       return '<button class="card macro" type="button" data-macro="' + m.key + '" style="--c:' + m.color + '">' +
         '<div class="row"><span class="name"><span class="dot"></span>' + m.label + '<span class="memo" aria-hidden="true">' + m.emoji + '</span></span><span class="chev" aria-hidden="true">›</span></div>' +
         '<div class="amt num">' + fmt(v) + ' <small>/ ' + goal + ' g</small></div>' +
-        '<div class="bar"><i style="width:' + Math.min(100, v / goal * 100).toFixed(1) + '%"></i></div>' +
+        '<div class="bar"><i data-w="' + Math.min(100, v / goal * 100).toFixed(1) + '" style="width:' + (lastBars[m.key + selectedDate] || 0) + '%"></i></div>' +
         '<div class="left' + (rem < 0 ? ' over' : '') + '">' + (rem < 0 ? fmt(-rem) + ' g over' : fmt(rem) + ' g left') + '</div>' +
         '</button>';
     }).join("");
+    // Bars slide from where they were to the new amount
+    var bars = $("macros").querySelectorAll(".bar i");
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      Array.prototype.forEach.call(bars, function (b, i) { b.style.width = b.dataset.w + "%"; lastBars[MACROS[i].key + selectedDate] = b.dataset.w; });
+    }); });
 
     renderCreatine();
 
@@ -1149,7 +1226,7 @@ select.in { padding-right: 30px;
           return '<li class="item">' +
             '<button class="item-main" type="button" data-toggle="' + e.id + '" aria-expanded="' + open + '">' +
               '<span class="t">' +
-                '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(e.time)) + '</span></div>' +
+                '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(e.time)) + '</span>' + proteinBadge([e]) + '</div>' +
                 '<div class="n">' + favStar([e]) + esc(e.name) + '</div>' +
                 '<div class="s">' + esc(servingText(e)) + (e.brand ? ' · ' + esc(e.brand) : '') + '</div>' +
                 macroRow([e]) +
@@ -1168,6 +1245,7 @@ select.in { padding-right: 30px;
                 '</div>' +
                 '<button class="remove" type="button" data-remove="' + e.id + '">Remove</button>' +
               '</div>' +
+              againBox("e:" + e.id) +
               favBox("e:" + e.id, shortName(e.name)) +
             '</div>' : '') +
             '</li>';
@@ -1207,7 +1285,7 @@ select.in { padding-right: 30px;
     return '<li class="item">' +
       '<button class="item-main" type="button" data-gtoggle="' + esc(u.gid) + '" aria-expanded="' + open + '">' +
         '<span class="t">' +
-          '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(first.time)) + '</span></div>' +
+          '<div class="when"><span class="tag ' + kind + '">' + KINDS[kind] + '</span><span>' + esc(fmtTime(first.time)) + '</span>' + proteinBadge(u.items) + '</div>' +
           '<div class="n">' + favStar(u.items) + esc(groupName(u)) + '</div>' +
           '<div class="s">' + itemsText(u.items.length) + (open ? '' : ' · tap to see them') + '</div>' +
           macroRow(u.items) +
@@ -1228,6 +1306,7 @@ select.in { padding-right: 30px;
           '</div>' +
         '</div>' +
         '<div class="edit-row"><span></span><button class="remove" type="button" data-gremove="' + esc(u.gid) + '">Remove whole ' + KINDS[kind].toLowerCase() + '</button></div>' +
+        againBox("g:" + u.gid) +
         favBox("g:" + u.gid, groupName(u)) +
       '</div>' : '') +
       '</li>';
@@ -1242,6 +1321,19 @@ select.in { padding-right: 30px;
     var id, e;
     if (b.dataset.favstart) { saving = b.dataset.favstart; render(); var fi = $("favName"); if (fi) { fi.focus(); fi.select(); } return; }
     if (b.dataset.favcancel) { saving = null; render(); return; }
+    if (b.dataset.again) {
+      var srcs = favSource(b.dataset.again); if (!srcs.length) return;
+      var today = dayKey(), atTime = nowHHMM(), nid = nextId();
+      var group = b.dataset.again.slice(0, 2) === "g:" && srcs.length > 1 ? "m" + Date.now().toString(36) : null;
+      srcs.forEach(function (x) {
+        var ne = Object.assign({}, x, { id: nid++, date: today, time: atTime });
+        if (group) ne.meal = group; else { delete ne.meal; delete ne.mealName; }
+        state.entries.push(ne);
+      });
+      save(); expanded = null; render();
+      toast((selectedDate === today ? "Logged again: " : "Added to today: ") + (group ? groupName({ items: srcs }) : shortName(srcs[0].name)));
+      return;
+    }
     if (b.dataset.favoff) {
       var fo = favMatch(favSource(b.dataset.favoff));
       if (fo) { state.settings.saved = favList().filter(function (x) { return x.id !== fo.id; }); save(); render(); toast("Removed " + fo.name + " from Favorites"); }
@@ -1352,6 +1444,7 @@ select.in { padding-right: 30px;
         '<p class="lead">Protein is a box of building blocks. One block, <b>leucine</b>, is the switch that starts the build. Hit your daily total, and spread it over 3 to 5 meals.</p>' +
         '<div class="learn-stats"><div><div class="v num">' + fmtG(today) + '<small>g</small></div><div class="k">' + (selectedDate === dayKey() ? "Eaten today" : "Eaten that day") + '</div></div>' +
         '<div><div class="v num">' + fmt(TARGETS.protein) + '<small>g</small></div><div class="k">' + (real ? "Your daily target" : "Sample target") + '</div></div></div>' +
+        '<p class="note"><span class="pbadge">🥩 Protein-rich</span> marks a meal with at least <b>' + proteinMealMin() + ' g</b> of protein' + (kg ? ' (about 0.4 g per kg of your weight)' : '') + '. Research links about that much per meal, over 3 to 4 meals, to the most muscle building.</p>' +
         '</section>';
 
       var how = learnSec("How protein builds muscle", "Bricks, the 9 must-haves, and the leucine switch",
@@ -1539,15 +1632,28 @@ select.in { padding-right: 30px;
     if (tl) tl.textContent = trayLogLabel();
   }
 
-  function recents() {
-    var seen = {}, out = [];
+  function foodKey(e) { return (e.custom ? "custom:" + e.name + "|" + (e.per100 ? e.per100.kcal : "") : (e.fdcId || e.name)) + "|" + e.unitLabel; }
+  // Foods logged 2+ times in the last 60 days, most often first (latest entry of each, so the amount is the usual one)
+  function mostEaten() {
+    var since = addDays(dayKey(), -60), c = {};
+    state.entries.forEach(function (e) {
+      if (e.date < since) return;
+      var k = foodKey(e), r = c[k] || (c[k] = { n: 0, e: e });
+      r.n++; if (e.id > r.e.id) r.e = e;
+    });
+    return Object.keys(c).map(function (k) { return c[k]; }).filter(function (r) { return r.n >= 2; })
+      .sort(function (a, b) { return b.n - a.n || b.e.id - a.e.id; }).slice(0, 6);
+  }
+  function recents(skip) {
+    var seen = Object.assign({}, skip || {}), out = [];
     state.entries.slice().sort(function (a, b) { return b.id - a.id; }).forEach(function (e) {
-      var k = (e.custom ? "custom:" + e.name + "|" + e.per100.kcal : (e.fdcId || e.name)) + "|" + e.unitLabel;
+      var k = foodKey(e);
       if (seen[k] || out.length >= 12) return;
       seen[k] = 1; out.push(e);
     });
     return out;
   }
+  window.__nutritionTest.mostEaten = mostEaten;
 
   function foodRow(attrs, name, meta, kcal, kcalNote) {
     return '<li><button class="food" type="button" ' + attrs + '>' +
@@ -1589,10 +1695,16 @@ select.in { padding-right: 30px;
     var html = trayBar + suggestHtml(q) + '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
       '<span class="t"><div class="n">Scan barcode</div><div class="m">Packaged foods in one step</div></span><span class="add" aria-hidden="true">›</span></button>' +
       '<button class="custom-entry" type="button" data-custom="1"><span class="ic" aria-hidden="true">✎</span>' +
-      '<span class="t"><div class="n">Custom food</div><div class="m">Type your own calories and macros</div></span><span class="add" aria-hidden="true">›</span></button>';
+      '<span class="t"><div class="n">Quick add or custom food</div><div class="m">Just type calories and macros. The name is optional.</div></span><span class="add" aria-hidden="true">›</span></button>';
     html += favRowsHtml(q);
     if (q.length < 2) {
-      var rec = recents();
+      var most = mostEaten(), shown = {};
+      most.forEach(function (r) { shown[foodKey(r.e)] = 1; });
+      if (most.length) {
+        html += '<div class="group-label">Most eaten</div><ul class="food-list">' +
+          most.map(function (r) { return foodRow('data-recent="' + r.e.id + '"', r.e.name, r.n + "× in 60 days · " + servingText(r.e), entryValue(r.e, "kcal"), "kcal"); }).join("") + '</ul>';
+      }
+      var rec = recents(shown);
       if (rec.length) {
         html += '<div class="group-label">Recent</div><ul class="food-list">' +
           rec.map(function (e) { return foodRow('data-recent="' + e.id + '"', e.name, servingText(e) + (e.brand ? " · " + e.brand : ""), entryValue(e, "kcal"), "kcal"); }).join("") + '</ul>';
@@ -2533,7 +2645,9 @@ select.in { padding-right: 30px;
     if (b.id === "completeBtn") {
       state.days[selectedDate] = Object.assign({}, state.days[selectedDate], { complete: true, target: TARGETS.kcal });
       save(); render();
-      toast(COMPLETE_MSG[dayInfo(selectedDate).status] || "Day complete");
+      var stNow = dayInfo(selectedDate).status;
+      if (stNow === "good") celebrate("✓", "Day complete. On target!", "var(--good)");
+      else toast(COMPLETE_MSG[stNow] || "Day complete");
     } else if (b.id === "reopenBtn") {
       var keepDay = Object.assign({}, state.days[selectedDate]);
       delete keepDay.complete; delete keepDay.target;
