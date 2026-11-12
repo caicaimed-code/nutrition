@@ -123,6 +123,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .macro { padding: 14px 14px 13px; text-align: left; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .macro .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .macro .name { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; }
+.macro .name .memo { font-size: 15px; line-height: 1; margin-left: 1px; }
+.macro-ex { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); color: var(--muted); font-size: 14px; line-height: 1.35; }
+.macro-ex-emoji { font-size: 26px; line-height: 1; flex: none; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; display: inline-block; }
 .macro .chev { color: var(--muted); font-size: 18px; line-height: 1; }
 .macro .amt { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
@@ -715,7 +718,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 37</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 38</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -817,10 +820,11 @@ select.in { padding-right: 30px;
   var KINDS = { meal: "Meal", snack: "Snack" };
   var OLD_MEAL_TIME = { Breakfast: "08:00", Lunch: "12:30", Dinner: "18:30", Snacks: "15:00" };
   var MACROS = [
-    { key: "protein", label: "Protein", color: "var(--protein)" },
-    { key: "carbs",   label: "Carbs",   color: "var(--carbs)" },
-    { key: "fat",     label: "Fat",     color: "var(--fat)" },
-    { key: "fiber",   label: "Fiber",   color: "var(--fiber)" }
+    // emoji + "found in" examples: Caio's picks (Nov 12) so people get a quick picture of each macro
+    { key: "protein", label: "Protein", color: "var(--protein)", emoji: "🥩", foods: "meat, fish, eggs, Greek yogurt, beans" },
+    { key: "carbs",   label: "Carbs",   color: "var(--carbs)",   emoji: "🍞", foods: "bread, rice, pasta, potatoes, fruit" },
+    { key: "fat",     label: "Fat",     color: "var(--fat)",     emoji: "🥑", foods: "avocado, olive oil, nuts, butter, cheese" },
+    { key: "fiber",   label: "Fiber",   color: "var(--fiber)",   emoji: "🥦", foods: "broccoli, beans, oats, berries, whole grains" }
   ];
 
   // USDA nutrient ids
@@ -1122,7 +1126,7 @@ select.in { padding-right: 30px;
     $("macros").innerHTML = MACROS.map(function (m) {
       var v = t[m.key], goal = TARGETS[m.key], rem = goal - v;
       return '<button class="card macro" type="button" data-macro="' + m.key + '" style="--c:' + m.color + '">' +
-        '<div class="row"><span class="name"><span class="dot"></span>' + m.label + '</span><span class="chev" aria-hidden="true">›</span></div>' +
+        '<div class="row"><span class="name"><span class="dot"></span>' + m.label + '<span class="memo" aria-hidden="true">' + m.emoji + '</span></span><span class="chev" aria-hidden="true">›</span></div>' +
         '<div class="amt num">' + fmt(v) + ' <small>/ ' + goal + ' g</small></div>' +
         '<div class="bar"><i style="width:' + Math.min(100, v / goal * 100).toFixed(1) + '%"></i></div>' +
         '<div class="left' + (rem < 0 ? ' over' : '') + '">' + (rem < 0 ? fmt(-rem) + ' g over' : fmt(rem) + ' g left') + '</div>' +
@@ -1343,7 +1347,7 @@ select.in { padding-right: 30px;
       var today = totals(entriesFor(selectedDate)).protein, w = currentWeight(), real = realTargets();
       var kg = w ? w * 0.453592 : null;
       var hero = '<section class="card learn-hero">' +
-        '<div class="kicker"><span class="dot" style="--c:var(--protein)"></span>Protein</div>' +
+        macroKicker("protein") +
         '<h1>Building blocks for muscle</h1>' +
         '<p class="lead">Protein is a box of building blocks. One block, <b>leucine</b>, is the switch that starts the build. Hit your daily total, and spread it over 3 to 5 meals.</p>' +
         '<div class="learn-stats"><div><div class="v num">' + fmtG(today) + '<small>g</small></div><div class="k">' + (selectedDate === dayKey() ? "Eaten today" : "Eaten that day") + '</div></div>' +
@@ -1450,10 +1454,15 @@ select.in { padding-right: 30px;
     fiber: function () { return macroHero("fiber", "Digestion and fullness", "Fiber is the part of plants you don't digest. It helps digestion and keeps you full.") + sourcesHtml("fiber") + comingSoon("fiber"); }
   };
   function macroInfo(key) { return MACROS.find(function (m) { return m.key === key; }); }
+  function macroKicker(key) {
+    var m = macroInfo(key);
+    return '<div class="kicker"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div>' +
+      '<div class="macro-ex"><span class="macro-ex-emoji" aria-hidden="true">' + m.emoji + '</span><span>Found in ' + m.foods + '</span></div>';
+  }
   function macroHero(key, title, lead) {
     var m = macroInfo(key), eaten = totals(entriesFor(selectedDate))[key];
     return '<section class="card learn-hero">' +
-      '<div class="kicker"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div>' +
+      macroKicker(key) +
       '<h1>' + title + '</h1><p class="lead">' + lead + '</p>' +
       '<div class="learn-stats"><div><div class="v num">' + fmtG(eaten) + '<small>g</small></div><div class="k">' + (selectedDate === dayKey() ? "Eaten today" : "Eaten that day") + '</div></div>' +
       '<div><div class="v num">' + fmt(TARGETS[key]) + '<small>g</small></div><div class="k">' + (realTargets() ? "Your daily target" : "Sample target") + '</div></div></div>' +
@@ -2997,7 +3006,7 @@ select.in { padding-right: 30px;
       '<ul><li><b>The refill:</b> muscles run on ATP and burn through it fast. Stored creatine refills it in one quick step. That powers the first 5 to 10 seconds of an all-out effort, like a heavy set.</li>' +
       '<li><b>Why that builds muscle:</b> fuller stores give you an extra rep or two per set. More total work over weeks means more growth. It only pays off if you train.</li>' +
       '<li><b>Where it comes from:</b> your body makes some, and meat and fish add 1 to 2 g a day. On food alone your muscles are about 60 to 80% full. A supplement tops them off.</li>' +
-      '<li><b>Vegetarians and vegans</b> get almost none from food and often gain more from it.</li></ul>' + ev("strong"), true);
+      '<li><b>Vegetarians and vegans</b> get almost none from food and often gain more from it.</li></ul>' + ev("strong"));
     var muscle = learnSec("What it does for muscle", "More strength from the same training",
       '<ul><li><b>Strength:</b> in 23 trials of adults under 50 who lifted, creatine added about 4.4 kg (10 lb) to upper-body lifts and 11.4 kg (25 lb) to lower-body lifts, compared with lifting alone (Wang 2024).</li>' +
       '<li><b>Muscle size:</b> a small extra gain when measured directly (Burke 2023, 10 trials).</li>' +
