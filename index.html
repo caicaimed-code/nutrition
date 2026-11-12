@@ -451,6 +451,14 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .summary { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .summary .v { font-size: 20px; font-weight: 700; }
 .summary .k { font-size: 12px; color: var(--muted); }
+.avg-macros { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 2px; }
+.avg-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.avg-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.avg-cell .v { font-size: 18px; }
+.avg-cell .v small { font-size: 12px; font-weight: 600; margin-left: 1px; }
+.avg-cell .k { display: flex; align-items: center; gap: 5px; color: var(--muted); }
+.avg-cell .k .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.avg-of { font-size: 11.5px; color: var(--muted); }
 .day-hero { padding: 18px 16px; display: flex; flex-direction: column; gap: 14px; }
 .day-hero .big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
 .day-hero .big small { font-family: var(--font-body); font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
@@ -707,7 +715,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 36</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 37</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -2630,7 +2638,21 @@ select.in { padding-right: 30px;
       '<div><div class="v num">' + (logged ? fmt(sum / logged) : "–") + '</div><div class="k">Average kcal (logged days)</div></div>' +
       '<div><div class="v num">' + done + '</div><div class="k">Days complete</div></div>' +
       '<div><div class="v num">' + (c.mid + c.bad) + ' <span style="font-size:13px;font-weight:500;color:var(--muted)">over</span> · ' + c.low + ' <span style="font-size:13px;font-weight:500;color:var(--muted)">low</span></div><div class="k">Other completed days</div></div>' +
+      avgMacrosHtml(infos) +
       '</section>';
+  }
+  // Average grams of each macro over the logged days in this week or month.
+  // A day counts for a macro only if at least one of its foods has data for it (imported rows can be blank).
+  function avgMacrosHtml(infos) {
+    var days = infos.filter(function (i) { return i.list.length; });
+    return '<div class="avg-macros"><div class="avg-title">Average per logged day</div><div class="avg-grid">' + MACROS.map(function (m) {
+      var sum = 0, n = 0;
+      days.forEach(function (i) { var v = macroSum(i.list, m.key); if (v != null) { sum += v; n++; } });
+      var avg = n ? sum / n : null;
+      return '<div class="avg-cell"><div class="v num">' + (avg == null ? '–' : fmt(avg) + '<small>g</small>') + '</div>' +
+        '<div class="k"><span class="dot" style="--c:' + m.color + '"></span>' + m.label + '</div>' +
+        (avg != null && realTargets() ? '<div class="avg-of">of ' + fmt(TARGETS[m.key]) + ' g</div>' : '') + '</div>';
+    }).join("") + '</div></div>';
   }
 
   function renderMonth() {
