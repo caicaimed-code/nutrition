@@ -458,6 +458,27 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .mini-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; }
 .mini-list li span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .mini-list li small { color: var(--muted); margin-right: 6px; }
+.mini-list li:first-child { border-top: 0; }
+/* Progress pics */
+.pic-add { display: flex; align-items: center; justify-content: center; width: 100%; cursor: pointer; font-size: 16px; }
+.pic-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.pic-tile { position: relative; display: block; width: 100%; border-radius: 16px; overflow: hidden; background: var(--surface); text-align: left; box-shadow: var(--shadow); }
+.pic-tile img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: var(--surface-2); }
+.pic-tile .cap, .pic-side figcaption { display: block; padding: 8px 10px 10px; }
+.pic-tile .cap b, .pic-side figcaption b { display: block; font-size: 14px; }
+.pic-tile .cap small, .pic-side figcaption small { color: var(--muted); font-size: 12.5px; }
+.pic-tile.sel { outline: 3px solid var(--carbs); outline-offset: -3px; }
+.pic-tile .chk { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.45); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.pic-tile.sel .chk { background: var(--carbs); }
+.pic-big { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 12px; background: #000; }
+.pic-cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.pic-side { margin: 0; }
+.pic-side img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: contain; background: #000; border-radius: 12px; }
+.pic-diff { margin: 0; text-align: center; font-weight: 600; font-size: 15px; }
+.pic-hint { margin: 0; font-size: 15px; }
+.pic-del { color: var(--warn); }
+.muted { color: var(--muted); }
+.vh-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 
 /* Weight */
 .w-hero { padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -682,7 +703,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 34</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 35</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -3096,9 +3117,11 @@ select.in { padding-right: 30px;
     else if (planView === "backup") html = "";
     else if (planView === "creatine") html = creatineView();
     else if (planView === "settings") html = settingsView();
+    else if (planView === "pics") html = '<div id="picsBody"></div>';
     else html = top + planBoxes(s, w, c, goal, hit, missing);
     $("planBody").innerHTML = html ? '<div class="cal-page">' + html + '</div>' : '';
-    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import", creatine: "Creatine", settings: "Settings" };
+    if (planView === "pics") renderPics();
+    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import", creatine: "Creatine", settings: "Settings", pics: "Progress pics" };
     $("planTitle").textContent = titles[planView];
     $("planTop").hidden = planView === "home";
     $("settingsBtn").hidden = planView !== "home";
@@ -3124,6 +3147,7 @@ select.in { padding-right: 30px;
       box("macros", "Macro targets", '<small>' + (realTargets() ? "In use" : "Samples for now") + '</small>' + mini) +
       box("stats", "Your stats", statsSub) +
       box("creatine", "Creatine", '<small>' + esc(crSummary()) + '</small>') +
+      box("pics", "Progress pics", '<small>' + esc(picsSummary()) + '</small>') +
       box("backup", "Backup", '<small id="boxBackupSub">' + esc(backupSummary()) + '</small>');
   }
   function backupSummary() {
@@ -3132,7 +3156,11 @@ select.in { padding-right: 30px;
     return (cloudState === "ok" ? "Backed up" : cloudState === "error" ? "Not backed up yet" : "Backing up…") + " · " + cloudUser.email;
   }
   function openPlanView(v) { planView = v; renderPlan(); renderBackup(); if (v === "backup") { renderImport(); renderGs(); } window.scrollTo(0, 0); }
-  $("planBack").addEventListener("click", function () { openPlanView("home"); });
+  $("planBack").addEventListener("click", function () {
+    // Inside Progress pics, Back first returns to the photo grid
+    if (planView === "pics" && picsMode !== "grid") { picsMode = "grid"; picsSel = []; picsNew = null; picsDelArm = false; renderPics(); window.scrollTo(0, 0); return; }
+    openPlanView("home");
+  });
 
   var planTimer = null, planAnim = false;
   function planChanged() {
@@ -3593,6 +3621,7 @@ select.in { padding-right: 30px;
         cloudUser = u;
         if (!u) { cloudBusy = false; cloudAgain = null; setCloud("out"); return; }
         if (was !== u.uid) cloudRun("pull");
+        setTimeout(photosSync, 1500);
       });
     }
     if (window.CloudSDK) go();
@@ -3609,6 +3638,265 @@ select.in { padding-right: 30px;
   window.addEventListener("online", function () { if (cloudUser) cloudRun("push"); });
   startCloud();
   window.__nutritionTest.cloudSync = function () { return sync; };
+
+  // ---------- Progress pics (Plan > Progress pics) ----------
+  // Photos live on the phone in IndexedDB (too big for localStorage) and back up to the person's own
+  // account: users/{uid}/photos/{id} holds the picture, users/{uid}/photoMeta/{id} the list entry.
+  // Each photo: { id, date "YYYY-MM-DD", img (JPEG data URL, shrunk to about 1280 px), createdAt, synced }
+  var PIC_DB = "dads-nutrition-photos", PIC_DEL_KEY = "dads-nutrition-photos-del";
+  var picsCache = null, picsErr = "", picsSyncing = false;
+  var picsMode = "grid", picsSel = [], picsNew = null, picsViewId = null, picsDelArm = false;
+  var picDbP = null;
+  function picDb() {
+    if (!picDbP) picDbP = new Promise(function (res, rej) {
+      if (!window.indexedDB) { rej(new Error("no indexedDB")); return; }
+      var r = indexedDB.open(PIC_DB, 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore("photos", { keyPath: "id" }); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+    return picDbP;
+  }
+  function picTx(mode, fn) {
+    return picDb().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction("photos", mode), req = fn(tx.objectStore("photos"));
+        tx.oncomplete = function () { res(req ? req.result : undefined); };
+        tx.onerror = function () { rej(tx.error); };
+      });
+    });
+  }
+  function picPut(p) { return picTx("readwrite", function (st) { return st.put(p); }); }
+  function picDel(id) { return picTx("readwrite", function (st) { return st.delete(id); }); }
+  function picDels() { try { return JSON.parse(localStorage.getItem(PIC_DEL_KEY)) || []; } catch (e) { return []; } }
+  function savePicDels(a) { try { localStorage.setItem(PIC_DEL_KEY, JSON.stringify(a)); } catch (e) {} }
+  function sortPics() { if (picsCache) picsCache.sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt - b.createdAt; }); }
+  function picsLoad() {
+    if (picsCache) return Promise.resolve(picsCache);
+    return picTx("readonly", function (st) { return st.getAll(); })
+      .then(function (all) { picsCache = all || []; sortPics(); return picsCache; },
+        function () { picsCache = []; picsErr = "This phone's browser won't save photos here."; return picsCache; });
+  }
+  function picById(id) { return (picsCache || []).find(function (p) { return p.id === id; }); }
+
+  // Shrink to about 1280 px on the long side as a JPEG, small enough to back up (under about 600 KB)
+  function compressPhoto(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var max = 1280, q = 0.82, out = "";
+        for (var i = 0; i < 6; i++) {
+          var s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+          var c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          out = c.toDataURL("image/jpeg", q);
+          if (out.length < 800000) break;
+          q = Math.max(0.5, q - 0.1); max = Math.round(max * 0.85);
+        }
+        res(out);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error("Couldn't read that photo.")); };
+      img.src = url;
+    });
+  }
+
+  // The weigh-in on that date, or the nearest one within 3 days
+  function weightNear(k) {
+    var best = null, t = parseKey(k).getTime();
+    state.weights.forEach(function (w) {
+      var d = Math.abs(parseKey(w.date).getTime() - t) / 864e5;
+      if (d <= 3.5 && (!best || d < best.d)) best = { d: d, lb: w.lb, date: w.date };
+    });
+    return best;
+  }
+  function weightText(k) {
+    var w = weightNear(k);
+    if (!w) return "No weight logged";
+    return fmtLb(w.lb) + " lb" + (w.date !== k ? " (from " + shortDate(w.date) + ")" : "");
+  }
+  function picDateText(k) { return parseKey(k).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
+  function daysBetween(a, b) { return Math.round((parseKey(b) - parseKey(a)) / 864e5); }
+
+  function picsSummary() {
+    if (!picsCache) return "Private photos to see your progress over time.";
+    if (!picsCache.length) return "No photos yet. Tap to add your first.";
+    var last = picsCache[picsCache.length - 1];
+    return picsCache.length + (picsCache.length === 1 ? " photo" : " photos") + " · latest " + shortDate(last.date);
+  }
+  function picsBackupNote() {
+    if (picsErr) return '<p class="note" style="color:var(--warn)">' + esc(picsErr) + '</p>';
+    if (!cloudUser) return '<p class="note">🔒 Only on this phone for now. Sign in on <b>Backup</b> to keep them safe and see them on your other phone.</p>';
+    var waiting = (picsCache || []).filter(function (p) { return !p.synced; }).length;
+    return '<p class="note">🔒 Private. Only you can see them. ' + (waiting ? "Backing up " + waiting + "…" : "Backed up to your account.") + '</p>';
+  }
+  function picTile(p, pick) {
+    var on = picsSel.indexOf(p.id) >= 0;
+    return '<button class="pic-tile' + (on ? " sel" : "") + '" type="button" data-pic="' + esc(p.id) + '">' +
+      '<img src="' + p.img + '" alt="Progress pic from ' + esc(picDateText(p.date)) + '" loading="lazy">' +
+      (pick ? '<span class="chk" aria-hidden="true">' + (on ? (picsSel.indexOf(p.id) + 1) : "") + '</span>' : '') +
+      '<span class="cap"><b>' + esc(picDateText(p.date)) + '</b><small>' + esc(weightText(p.date)) + '</small></span></button>';
+  }
+  function picFigure(p) {
+    return '<figure class="pic-side"><img src="' + p.img + '" alt="Progress pic from ' + esc(picDateText(p.date)) + '">' +
+      '<figcaption><b>' + esc(picDateText(p.date)) + '</b><small>' + esc(weightText(p.date)) + '</small></figcaption></figure>';
+  }
+  function compareSummary(a, b) {
+    var days = daysBetween(a.date, b.date), wa = weightNear(a.date), wb = weightNear(b.date);
+    var t = days === 0 ? "Same day" : days + (days === 1 ? " day" : " days") + " apart";
+    if (days >= 14) t += " (" + (Math.round(days / 7 * 10) / 10) + " weeks)";
+    if (wa && wb) { var d = Math.round((wb.lb - wa.lb) * 10) / 10; t += " · " + (d > 0 ? "+" : d < 0 ? "−" : "±") + fmtLb(Math.abs(d)) + " lb"; }
+    return t;
+  }
+
+  function renderPics() {
+    var box = $("picsBody"); if (!box) return;
+    if (!picsCache) { box.innerHTML = '<p class="note">Loading…</p>'; picsLoad().then(renderPics); return; }
+    var list = picsCache, html = "";
+    if (picsMode === "new" && picsNew) {
+      var today = dayKey();
+      html = '<section class="card plan-card">' +
+        '<img class="pic-big" style="max-height:48vh" src="' + picsNew.img + '" alt="New progress pic">' +
+        '<div><label class="lab" for="picDate">Date taken</label><input class="in" id="picDate" type="date" value="' + esc(picsNew.date) + '" max="' + today + '"></div>' +
+        '<p class="note" id="picNewW">Weight: ' + esc(weightText(picsNew.date)) + '</p>' +
+        '<div class="btn-row"><button class="btn-outline" type="button" data-picact="cancel">Cancel</button><button class="btn-sm" type="button" data-picact="save">Save photo</button></div>' +
+        '</section>';
+    } else if (picsMode === "view" && picById(picsViewId)) {
+      var p = picById(picsViewId);
+      html = '<section class="card plan-card">' +
+        '<img class="pic-big" src="' + p.img + '" alt="Progress pic">' +
+        '<div><b>' + esc(picDateText(p.date)) + '</b><br><small class="muted">' + esc(weightText(p.date)) + '</small></div>' +
+        '<div class="btn-row"><button class="btn-outline" type="button" data-picact="cmpwith">Compare with…</button>' +
+        '<button class="btn-outline pic-del" type="button" data-picact="del">' + (picsDelArm ? "Tap again to delete" : "Delete") + '</button></div>' +
+        '</section>';
+    } else if (picsMode === "compare" && picsSel.length === 2 && picById(picsSel[0]) && picById(picsSel[1])) {
+      var two = [picById(picsSel[0]), picById(picsSel[1])].sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt - b.createdAt; });
+      html = '<section class="card plan-card">' +
+        '<div class="pic-cmp">' + picFigure(two[0]) + picFigure(two[1]) + '</div>' +
+        '<p class="pic-diff">' + esc(compareSummary(two[0], two[1])) + '</p>' +
+        '<button class="btn-outline" type="button" data-picact="pick">Pick different photos</button>' +
+        '</section>';
+    } else {
+      if (picsMode !== "pick") picsMode = "grid";
+      var pick = picsMode === "pick";
+      html = '<section class="card plan-card" style="position:relative">' +
+        '<label class="btn-sm pic-add" for="picFile">📷 Add progress pic</label>' +
+        '<input id="picFile" class="vh-file" type="file" accept="image/*">' +
+        picsBackupNote() +
+        '</section>';
+      if (list.length >= 2) {
+        html += pick
+          ? '<section class="card plan-card"><p class="pic-hint"><b>Pick 2 photos to compare</b> (' + picsSel.length + ' of 2)</p>' +
+            '<div class="btn-row"><button class="btn-outline" type="button" data-picact="firstlast">First vs latest</button><button class="btn-outline" type="button" data-picact="pickcancel">Cancel</button></div></section>'
+          : '<button class="btn-outline" type="button" data-picact="pick">⇆ Compare two photos</button>';
+      }
+      if (list.length) {
+        html += '<div class="pic-grid">' + list.slice().reverse().map(function (p) { return picTile(p, pick); }).join("") + '</div>';
+      } else {
+        html += '<p class="note" style="text-align:center;padding:12px 8px">Take one from the same spot, same light and same pose each time (for example every 2 weeks, in the morning). That makes the changes easy to see.</p>';
+      }
+    }
+    box.innerHTML = html;
+  }
+  function picsRefresh() {
+    if (currentTab !== "plan") return;
+    if (planView === "pics") renderPics();
+    else if (planView === "home") renderPlan();
+  }
+
+  function photosSync() {
+    if (!cloudUser || !cloud || !cloud.listPhotoMeta || picsSyncing) return Promise.resolve();
+    picsSyncing = true;
+    var uid = cloudUser.uid;
+    return picsLoad().then(function () {
+      var dels = picDels();
+      return dels.reduce(function (pr, id) { return pr.then(function () { return cloud.deletePhoto(uid, id); }); }, Promise.resolve())
+        .then(function () { savePicDels([]); });
+    }).then(function () { return cloud.listPhotoMeta(uid); }).then(function (meta) {
+      var inCloud = {}, jobs = [];
+      meta.forEach(function (m) { inCloud[m.id] = m; });
+      picsCache.slice().forEach(function (p) {
+        if (!p.synced) jobs.push(function () {
+          return cloud.putPhoto(uid, p.id, { date: p.date, img: p.img, createdAt: p.createdAt }).then(function () { p.synced = true; return picPut(p); });
+        });
+        else if (!inCloud[p.id]) jobs.push(function () { // deleted on another phone
+          return picDel(p.id).then(function () { picsCache = picsCache.filter(function (x) { return x !== p; }); });
+        });
+      });
+      meta.forEach(function (m) {
+        if (picById(m.id)) return;
+        jobs.push(function () {
+          return cloud.getPhoto(uid, m.id).then(function (d) {
+            if (!d || !d.img) return;
+            var p = { id: m.id, date: d.date || m.date, img: d.img, createdAt: d.createdAt || m.createdAt || 0, synced: true };
+            picsCache.push(p); return picPut(p);
+          });
+        });
+      });
+      return jobs.reduce(function (pr, j) { return pr.then(j); }, Promise.resolve());
+    }).then(function () { if (picsErr.indexOf("backed up") >= 0) picsErr = ""; },
+      function () { picsErr = "Some photos aren't backed up yet. The app will try again."; })
+      .then(function () { picsSyncing = false; sortPics(); if (picsMode === "grid") picsRefresh(); });
+  }
+
+  $("planBody").addEventListener("change", function (ev) {
+    var t = ev.target;
+    if (t.id === "picFile" && t.files && t.files[0]) {
+      var f = t.files[0]; t.value = "";
+      compressPhoto(f).then(function (img) {
+        picsNew = { img: img, date: dayKey() }; picsMode = "new"; renderPics(); window.scrollTo(0, 0);
+      }, function (e) { toast(e.message); });
+    }
+    if (t.id === "picDate" && picsNew) {
+      if (t.value && t.value <= dayKey()) picsNew.date = t.value;
+      var w = $("picNewW"); if (w) w.textContent = "Weight: " + weightText(picsNew.date);
+    }
+  });
+  $("planBody").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-pic],[data-picact]"); if (!b) return;
+    var act = b.dataset.picact;
+    if (b.dataset.pic) {
+      var id = b.dataset.pic;
+      if (picsMode === "pick") {
+        var i = picsSel.indexOf(id);
+        if (i >= 0) picsSel.splice(i, 1); else picsSel.push(id);
+        if (picsSel.length > 2) picsSel = picsSel.slice(-2);
+        if (picsSel.length === 2) { picsMode = "compare"; window.scrollTo(0, 0); }
+      } else { picsMode = "view"; picsViewId = id; picsDelArm = false; window.scrollTo(0, 0); }
+      renderPics(); return;
+    }
+    if (act === "cancel") { picsNew = null; picsMode = "grid"; renderPics(); return; }
+    if (act === "save" && picsNew) {
+      var p = { id: "p" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), date: picsNew.date, img: picsNew.img, createdAt: Date.now(), synced: false };
+      picsLoad().then(function () { return picPut(p); }).then(function () {
+        picsCache.push(p); sortPics(); picsNew = null; picsMode = "grid"; renderPics();
+        toast("Progress pic saved"); photosSync();
+      }, function () { toast("Couldn't save the photo on this phone."); });
+      return;
+    }
+    if (act === "pick") { picsMode = "pick"; picsSel = []; renderPics(); return; }
+    if (act === "pickcancel") { picsMode = "grid"; picsSel = []; renderPics(); return; }
+    if (act === "firstlast" && picsCache.length >= 2) {
+      picsSel = [picsCache[0].id, picsCache[picsCache.length - 1].id]; picsMode = "compare"; renderPics(); window.scrollTo(0, 0); return;
+    }
+    if (act === "cmpwith" && picsViewId) { picsSel = [picsViewId]; picsMode = "pick"; renderPics(); return; }
+    if (act === "del" && picsViewId) {
+      if (!picsDelArm) { picsDelArm = true; renderPics(); return; }
+      var gone = picById(picsViewId);
+      picDel(gone.id).then(function () {
+        picsCache = picsCache.filter(function (x) { return x !== gone; });
+        if (gone.synced) {
+          var dels = picDels(); dels.push(gone.id); savePicDels(dels);
+          photosSync();
+        }
+        picsMode = "grid"; picsViewId = null; picsDelArm = false; renderPics(); toast("Photo deleted");
+      });
+    }
+  });
+  picsLoad().then(function () { if (currentTab === "plan" && planView === "home") renderPlan(); });
+  window.__nutritionTest.pics = function () { return picsCache; };
+  window.__nutritionTest.photosSync = photosSync;
 
   // ---------- Google Sheet copy (optional, per person) ----------
   // Sends each changed day to a Google Apps Script web app the person set up in their own sheet.

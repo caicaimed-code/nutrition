@@ -6,7 +6,7 @@ import {
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail
 } from "firebase/auth";
 import {
-  getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, serverTimestamp, Timestamp
+  getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp, Timestamp
 } from "firebase/firestore/lite";
 
 function ms(t) { return t && typeof t.toMillis === "function" ? t.toMillis() : 0; }
@@ -47,6 +47,24 @@ window.CloudSDK = {
       },
       putDay: function (uid, date, data) {
         return setDoc(doc(db, "users", uid, "days", date), Object.assign(plain(data), { updatedAt: serverTimestamp() }));
+      },
+      // Progress pics: the picture in users/{uid}/photos/{id}, a small list entry in users/{uid}/photoMeta/{id}
+      // so the app can see which photos exist without downloading every picture.
+      listPhotoMeta: function (uid) {
+        return getDocs(collection(db, "users", uid, "photoMeta")).then(function (snap) {
+          return snap.docs.map(function (s) { var d = s.data(); return { id: s.id, date: d.date || "", createdAt: d.createdAt || 0 }; });
+        });
+      },
+      getPhoto: function (uid, id) {
+        return getDoc(doc(db, "users", uid, "photos", id)).then(function (s) { return s.exists() ? s.data() : null; });
+      },
+      putPhoto: function (uid, id, p) {
+        return setDoc(doc(db, "users", uid, "photos", id), { date: p.date, img: p.img, createdAt: p.createdAt })
+          .then(function () { return setDoc(doc(db, "users", uid, "photoMeta", id), { date: p.date, createdAt: p.createdAt }); });
+      },
+      deletePhoto: function (uid, id) {
+        return deleteDoc(doc(db, "users", uid, "photoMeta", id))
+          .then(function () { return deleteDoc(doc(db, "users", uid, "photos", id)); });
       }
     };
   }
