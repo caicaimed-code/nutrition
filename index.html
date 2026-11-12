@@ -227,6 +227,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .scan-wrap { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
 .scan-manual { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 6px; }
 .scan-manual .btn-sm { height: 50px; padding: 0 18px; }
+.scan-torch { position: absolute; right: 12px; bottom: 12px; width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: 22px; display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255,255,255,.5); }
+.scan-torch[aria-pressed="true"] { background: #FFD60A; color: #000; border-color: #FFD60A; }
+.scan-photo { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.scan-photo-note { text-align: center; color: var(--muted); font-size: 12.5px; margin: 6px 0 10px; }
 .custom-entry { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); text-align: left; }
 .custom-entry .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; font-size: 18px; flex: none; }
 .custom-entry .t { flex: 1; min-width: 0; }
@@ -703,7 +707,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 35</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 36</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -2069,7 +2073,7 @@ select.in { padding-right: 30px;
   window.__nutritionTest.favList = favList;
 
   // ---------- Barcode scanner ----------
-  var stopScan = null, scanBusy = false, scanLoading = false;
+  var stopScan = null, scanBusy = false, scanLoading = false, scanCtl = null, scanPhotoMode = false;
   function leaveScan() { if (stopScan) { try { stopScan(); } catch (e) {} stopScan = null; } scanBusy = false; }
 
   // Scanned foods start in grams (or ml) with the label's serving size filled in, so you only change the number
@@ -2095,13 +2099,38 @@ select.in { padding-right: 30px;
     showView("scan");
     $("sheetBody").innerHTML =
       '<div class="scan-wrap">' +
-        '<div class="scan-box"><video id="scanVideo" playsinline muted autoplay></video><div class="scan-frame"><i></i></div></div>' +
+        '<div class="scan-box"><video id="scanVideo" playsinline muted autoplay></video><div class="scan-frame"><i></i></div>' +
+          '<button class="scan-torch" id="scanTorch" type="button" aria-pressed="false" aria-label="Flash" hidden>🔦</button></div>' +
         '<div class="scan-msg" id="scanMsg" role="status" aria-live="polite">Starting camera…</div>' +
         '<p class="scan-sub" id="scanSub"></p>' +
+        '<label class="btn-outline scan-photo" for="scanPhoto" id="scanPhotoBtn">📷 Take a photo of the barcode instead</label>' +
+        '<input id="scanPhoto" class="vh-file" type="file" accept="image/*" capture="environment">' +
+        '<p class="scan-photo-note">Uses your phone\'s own camera: no camera pop-up, and its flash works.</p>' +
         '<form class="scan-manual" id="scanManual"><div class="field"><label for="scanCode">Or type the barcode number</label>' +
           '<input id="scanCode" type="text" inputmode="numeric" autocomplete="off" placeholder="Numbers under the bars"></div>' +
           '<button class="btn-sm" type="submit">Look up</button></form>' +
       '</div>';
+    scanPhotoMode = false;
+    $("scanTorch").addEventListener("click", function () {
+      var b = this, on = b.getAttribute("aria-pressed") !== "true";
+      if (!scanCtl || !scanCtl.torch) return;
+      scanCtl.torch(on).then(function () { b.setAttribute("aria-pressed", on ? "true" : "false"); },
+        function () { toast("The flash didn't turn on. Try the photo option below."); });
+    });
+    // Taking a photo: free the live camera first (the phone's camera app needs it)
+    $("scanPhotoBtn").addEventListener("click", function () { scanPhotoMode = true; leaveScan(); scanMessage("Take a photo of the barcode", "Fill the middle of the photo with the barcode."); });
+    $("scanPhoto").addEventListener("change", function () {
+      var f = this.files && this.files[0]; this.value = "";
+      if (!f) return;
+      scanMessage("Reading the photo…", "");
+      function read() {
+        window.ScanSDK.decodeFile(f).then(function (code) { onBarcode(code); }, function () {
+          scanMessage("Couldn't find a barcode in that photo", "Get closer so the barcode fills the middle and is sharp, or type the number below.");
+        });
+      }
+      if (window.ScanSDK && window.ScanSDK.decodeFile) read();
+      else { var sc = document.createElement("script"); sc.src = "scan.js"; sc.onload = read; sc.onerror = function () { scanMessage("Couldn't load the scanner", "Check your internet, or type the barcode number below."); }; document.head.appendChild(sc); }
+    });
     $("scanManual").addEventListener("submit", function (ev) {
       ev.preventDefault();
       var c = $("scanCode").value.replace(/\D/g, "");
@@ -2121,12 +2150,18 @@ select.in { padding-right: 30px;
       scanLoading = false;
       if (view !== "scan") return;
       scanMessage("Point the camera at the barcode", "Hold steady about a hand's width away. Good light helps.");
-      stopScan = window.ScanSDK.start(video, onBarcode, function (err) {
+      var r = window.ScanSDK.start(video, onBarcode, function (err) {
         var n = err && err.name;
-        if (n === "NotAllowedError" || n === "SecurityError") scanMessage("The camera is blocked", "Allow camera access in your phone's settings for this app, or type the barcode number below.");
+        if (n === "NotAllowedError" || n === "SecurityError") scanMessage("The camera is blocked", "Take a photo of the barcode below instead, or type the number.");
         else if (n === "NotFoundError" || n === "OverconstrainedError") scanMessage("No camera found", "Type the barcode number below instead.");
-        else scanMessage("The camera didn't start", "Close other apps using the camera and try again, or type the number below.");
+        else scanMessage("The camera didn't start", "Close other apps using the camera and try again, or take a photo of the barcode below.");
+      }, function (info) {
+        var tb = $("scanTorch");
+        if (tb && info && info.torch && view === "scan") tb.hidden = false;
       });
+      // Newer scanner returns { stop, torch }; older test fakes return a stop function
+      scanCtl = typeof r === "function" ? { stop: r } : r;
+      stopScan = function () { var t = $("scanTorch"); if (t) { t.hidden = true; t.setAttribute("aria-pressed", "false"); } if (scanCtl) scanCtl.stop(); scanCtl = null; };
     }
     if (window.ScanSDK) { go(); return; }
     if (scanLoading) return;
@@ -2140,7 +2175,7 @@ select.in { padding-right: 30px;
   document.addEventListener("visibilitychange", function () {
     if (view !== "scan") return;
     if (document.hidden) { if (stopScan) { leaveScan(); } }
-    else if (!scanBusy && !stopScan && $("scanVideo")) startCamera();
+    else if (!scanBusy && !stopScan && !scanPhotoMode && $("scanVideo")) startCamera();
   });
 
   function onBarcode(raw) {
