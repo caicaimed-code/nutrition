@@ -15,7 +15,8 @@
 <meta name="theme-color" content="#F3F5F8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <script>/* Appearance chosen in Settings (this device only), applied before the page draws */
-try { var t0 = localStorage.getItem("dads-nutrition-theme"); if (t0 === "light" || t0 === "dark") document.documentElement.setAttribute("data-theme", t0); } catch (e) {}</script>
+try { var t0 = localStorage.getItem("dads-nutrition-theme"); if (t0 === "light" || t0 === "dark") document.documentElement.setAttribute("data-theme", t0); } catch (e) {}
+try { var z0 = localStorage.getItem("dads-nutrition-text"); if (z0 === "l" || z0 === "xl") document.documentElement.setAttribute("data-size", z0); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://api.nal.usda.gov">
@@ -509,6 +510,18 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .pic-hint { margin: 0; font-size: 15px; }
 .pic-del { color: var(--warn); }
 .muted { color: var(--muted); }
+/* Bigger text (Settings): scales the pages, the tab bar and the add-food sheet's contents */
+:root[data-size="l"] .app, :root[data-size="l"] .sheet-head, :root[data-size="l"] .sheet-body { zoom: 1.12; }
+:root[data-size="xl"] .app, :root[data-size="xl"] .sheet-head, :root[data-size="xl"] .sheet-body { zoom: 1.25; }
+:root[data-size="l"] .tabbar-in, :root[data-size="xl"] .tabbar-in { zoom: 1.04; } /* 5 tabs must still fit side by side */
+.fb-text { width: 100%; min-height: 120px; resize: vertical; font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--fg); }
+.pic-slider { position: relative; width: 100%; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; background: #000; touch-action: pan-y; }
+.pic-slider img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.pic-slider .after { clip-path: inset(0 0 0 var(--cut, 50%)); }
+.pic-slider .divider { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 6px rgba(0,0,0,.5); pointer-events: none; }
+.pic-slider .divider::after { content: "⇆"; position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; background: #fff; color: #000; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.pic-slider .lbl { position: absolute; top: 8px; padding: 2px 8px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 600; }
+.pic-range { width: 100%; margin: 10px 0 0; accent-color: var(--fg); }
 .vh-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 
 /* Weight */
@@ -735,7 +748,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 39</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 40</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -3196,15 +3209,111 @@ select.in { padding-right: 30px;
   function settingsView() {
     var t = themePref(), ver = ($("appVersion") && $("appVersion").textContent) || "";
     var opt = function (id, label) { return '<button type="button" data-theme-opt="' + id + '" aria-pressed="' + (t === id) + '">' + label + '</button>'; };
+    var z = textSizePref();
+    var zopt = function (id, label) { return '<button type="button" data-size-opt="' + id + '" aria-pressed="' + (z === id) + '"' + (id ? ' style="font-size:' + (id === "l" ? 16 : 18) + 'px"' : '') + '>' + label + '</button>'; };
     function box(id, title, sub) { return '<button class="card plan-box" type="button" data-pview="' + id + '"><span class="t"><b>' + title + '</b><small>' + sub + '</small></span><span class="chev" aria-hidden="true">›</span></button>'; }
     return '<section class="card plan-card"><span class="lab" style="margin:0">Appearance</span>' +
         '<div class="seg seg3" role="group" aria-label="Appearance">' + opt("auto", "Auto") + opt("light", "Light") + opt("dark", "Dark") + '</div>' +
         '<p class="note">Auto matches your phone\'s light or dark mode. Saved on this phone only.</p></section>' +
+      '<section class="card plan-card"><span class="lab" style="margin:0">Text size</span>' +
+        '<div class="seg seg3" role="group" aria-label="Text size">' + zopt("", "Normal") + zopt("l", "Large") + zopt("xl", "Larger") + '</div>' +
+        '<p class="note">Makes everything bigger and easier to read. Saved on this phone only.</p></section>' +
       '<section class="card plan-card"><div class="backup-row"><span class="t" style="flex:1;min-width:0"><b>' + esc(ver) + '</b><small>The app updates itself when you open it with internet. Tap to get the newest version now.</small></span>' +
         '<button class="add-btn" type="button" id="updBtn">Update</button></div></section>' +
       box("creatine", "Creatine tracker", esc(crSummary())) +
-      box("backup", "Backup & import", esc(backupSummary()));
+      box("backup", "Backup & import", esc(backupSummary())) +
+      '<section class="card plan-card"><div class="backup-row"><span class="t" style="flex:1;min-width:0"><b>Download my data</b><small>Your food log and weigh-ins as spreadsheet files (open in Excel, Google Sheets or Numbers).</small></span>' +
+        '<button class="add-btn" type="button" id="exportBtn">Download</button></div></section>' +
+      feedbackHtml();
   }
+  // ---------- Text size (this phone only) ----------
+  var TEXT_KEY = "dads-nutrition-text";
+  function textSizePref() { try { var v = localStorage.getItem(TEXT_KEY); return v === "l" || v === "xl" ? v : ""; } catch (e) { return ""; } }
+  function setTextSize(v) {
+    try { if (v) localStorage.setItem(TEXT_KEY, v); else localStorage.removeItem(TEXT_KEY); } catch (e) {}
+    if (v) document.documentElement.setAttribute("data-size", v); else document.documentElement.removeAttribute("data-size");
+  }
+
+  // ---------- Download my data (CSV files) ----------
+  function csvCell(v) { v = v == null ? "" : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function csvOf(rows) { return "\ufeff" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n") + "\r\n"; }
+  function exportFiles() {
+    var g1 = function (v) { return v == null ? "" : Math.round(v * 10) / 10; };
+    var food = [["Date", "Time", "Meal or snack", "Meal name", "Food", "Brand", "Amount", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)"]];
+    state.entries.slice().sort(function (a, b) { return a.date.localeCompare(b.date) || byTime(a, b); }).forEach(function (e) {
+      food.push([e.date, e.time || "", KINDS[e.kind === "snack" ? "snack" : "meal"], e.meal ? (e.mealName || "") : "", e.name, e.brand || "", servingText(e),
+        Math.round(entryValue(e, "kcal")), g1(macroSum([e], "protein")), g1(macroSum([e], "carbs")), g1(macroSum([e], "fat")), g1(macroSum([e], "fiber"))]);
+    });
+    var wts = [["Date", "Weight (lb)"]];
+    state.weights.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (w) { wts.push([w.date, w.lb]); });
+    var stamp = dayKey();
+    return [
+      new File([csvOf(food)], "nutrition-food-log-" + stamp + ".csv", { type: "text/csv" }),
+      new File([csvOf(wts)], "nutrition-weights-" + stamp + ".csv", { type: "text/csv" })
+    ];
+  }
+  function exportData() {
+    var files = exportFiles();
+    if (navigator.canShare && navigator.share) {
+      try {
+        if (navigator.canShare({ files: files })) {
+          navigator.share({ files: files, title: "My nutrition data" }).catch(function (e) { if (e && e.name !== "AbortError") downloadFiles(files); });
+          return;
+        }
+      } catch (e) {}
+    }
+    downloadFiles(files);
+  }
+  function downloadFiles(files) {
+    files.forEach(function (f, i) {
+      setTimeout(function () {
+        var a = document.createElement("a"), url = URL.createObjectURL(f);
+        a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      }, i * 400);
+    });
+    toast("Downloading 2 files");
+  }
+  window.__nutritionTest.exportFiles = exportFiles;
+
+  // ---------- Ideas and feedback (emailed to Caio through his own Google Apps Script) ----------
+  // The script sends the email to the account that deployed it, so no email address is in this public code.
+  var FEEDBACK_URL = "";
+  var FB_QUEUE = "dads-nutrition-feedback";
+  var fbType = "Idea";
+  function feedbackHtml() {
+    var t = function (id) { return '<button type="button" data-fbtype="' + id + '" aria-pressed="' + (fbType === id) + '">' + id + '</button>'; };
+    return '<section class="card plan-card" id="fbCard"><span class="lab" style="margin:0">Ideas and feedback</span>' +
+      '<p class="note" style="margin-top:0">Have an idea, found a problem, or something bugs you? Tell Caio. Every message is read.</p>' +
+      '<div class="seg seg3" role="group" aria-label="Kind of feedback">' + t("Idea") + t("Problem") + t("Other") + '</div>' +
+      '<textarea class="fb-text" id="fbText" maxlength="4000" placeholder="Write it here…"></textarea>' +
+      (cloudUser && cloudUser.email ? '<label class="switch-row" style="padding:0"><span class="t"><b style="font-size:14px">Let Caio reply</b><small>Adds your email (' + esc(cloudUser.email) + ')</small></span><input type="checkbox" id="fbReply" checked></label>' : '') +
+      '<button class="btn-sm" type="button" id="fbSend" style="width:100%">Send</button></section>';
+  }
+  function fbQueue() { try { return JSON.parse(localStorage.getItem(FB_QUEUE)) || []; } catch (e) { return []; } }
+  function fbSaveQueue(q) { try { if (q.length) localStorage.setItem(FB_QUEUE, JSON.stringify(q)); else localStorage.removeItem(FB_QUEUE); } catch (e) {} }
+  // Sends anything waiting (messages written before the email link was set up, or while offline)
+  function fbFlush() {
+    var q = fbQueue();
+    if (!q.length || !FEEDBACK_URL || !navigator.onLine) return Promise.resolve(false);
+    return q.reduce(function (pr, m) {
+      return pr.then(function () {
+        return fetch(FEEDBACK_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(m) })
+          .then(function () { fbSaveQueue(fbQueue().filter(function (x) { return x.id !== m.id; })); });
+      });
+    }, Promise.resolve()).then(function () { return true; }, function () { return false; });
+  }
+  function fbSend() {
+    var txt = ($("fbText").value || "").trim();
+    if (!txt) { toast("Write something first"); return; }
+    var reply = $("fbReply") && $("fbReply").checked && cloudUser ? cloudUser.email : "";
+    var m = { app: "nutrition", id: Date.now().toString(36), type: fbType, text: txt, email: reply, version: ($("appVersion") || {}).textContent || "", device: navigator.userAgent.slice(0, 160), sent: new Date().toISOString() };
+    var q = fbQueue(); q.push(m); fbSaveQueue(q);
+    $("fbText").value = "";
+    fbFlush().then(function (sent) { toast(sent ? "Sent. Thank you!" : "Saved. It will be sent as soon as it can. Thank you!"); });
+  }
+  window.__nutritionTest.fbQueue = fbQueue;
+  setTimeout(fbFlush, 4000);
   function checkUpdate() {
     toast("Getting the newest version…");
     var go = function () { setTimeout(function () { location.reload(); }, 500); };
@@ -3358,6 +3467,14 @@ select.in { padding-right: 30px;
     var b = ev.target.closest("button"); if (!b) return;
     if (b.dataset.pview) { openPlanView(b.dataset.pview); return; }
     if (b.dataset.themeOpt) { setTheme(b.dataset.themeOpt); renderPlan(); return; }
+    if (b.dataset.sizeOpt !== undefined) { setTextSize(b.dataset.sizeOpt); renderPlan(); return; }
+    if (b.id === "exportBtn") { exportData(); return; }
+    if (b.dataset.fbtype) { // keep what's typed: just move the highlight
+      fbType = b.dataset.fbtype;
+      Array.prototype.forEach.call(b.parentNode.children, function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      return;
+    }
+    if (b.id === "fbSend") { fbSend(); return; }
     if (b.id === "updBtn") { checkUpdate(); return; }
     if (b.dataset.cr || b.dataset.crgoal) {
       var cr = Object.assign({ on: false, goal: "muscle" }, crSettings()), today = dayKey();
@@ -3825,7 +3942,7 @@ select.in { padding-right: 30px;
   // Each photo: { id, date "YYYY-MM-DD", img (JPEG data URL, shrunk to about 1280 px), createdAt, synced }
   var PIC_DB = "dads-nutrition-photos", PIC_DEL_KEY = "dads-nutrition-photos-del";
   var picsCache = null, picsErr = "", picsSyncing = false;
-  var picsMode = "grid", picsSel = [], picsNew = null, picsViewId = null, picsDelArm = false;
+  var picsMode = "grid", picsSel = [], picsNew = null, picsViewId = null, picsDelArm = false, picsCmpView = "side";
   var picDbP = null;
   function picDb() {
     if (!picDbP) picDbP = new Promise(function (res, rej) {
@@ -3952,8 +4069,15 @@ select.in { padding-right: 30px;
         '</section>';
     } else if (picsMode === "compare" && picsSel.length === 2 && picById(picsSel[0]) && picById(picsSel[1])) {
       var two = [picById(picsSel[0]), picById(picsSel[1])].sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt - b.createdAt; });
+      var segBtn = function (id, label) { return '<button type="button" data-picact="cmp-' + id + '" aria-pressed="' + (picsCmpView === id) + '">' + label + '</button>'; };
       html = '<section class="card plan-card">' +
-        '<div class="pic-cmp">' + picFigure(two[0]) + picFigure(two[1]) + '</div>' +
+        '<div class="seg" role="group" aria-label="Compare view">' + segBtn("side", "Side by side") + segBtn("slider", "Slider") + '</div>' +
+        (picsCmpView === "slider"
+          ? '<div><div class="pic-slider" id="picSlider" style="--cut:50%"><img src="' + two[0].img + '" alt="Before"><img class="after" src="' + two[1].img + '" alt="After">' +
+              '<span class="divider"></span><span class="lbl" style="left:8px">' + esc(shortDate(two[0].date)) + '</span><span class="lbl" style="right:8px">' + esc(shortDate(two[1].date)) + '</span></div>' +
+              '<input class="pic-range" id="picRange" type="range" min="0" max="100" value="50" aria-label="Slide between the two photos">' +
+              '<p class="note" style="text-align:center;margin:4px 0 0">Drag to slide between ' + esc(picDateText(two[0].date)) + ' and ' + esc(picDateText(two[1].date)) + '</p></div>'
+          : '<div class="pic-cmp">' + picFigure(two[0]) + picFigure(two[1]) + '</div>') +
         '<p class="pic-diff">' + esc(compareSummary(two[0], two[1])) + '</p>' +
         '<button class="btn-outline" type="button" data-picact="pick">Pick different photos</button>' +
         '</section>';
@@ -4020,6 +4144,23 @@ select.in { padding-right: 30px;
       .then(function () { picsSyncing = false; sortPics(); if (picsMode === "grid") picsRefresh(); });
   }
 
+  $("planBody").addEventListener("input", function (ev) {
+    if (ev.target.id === "picRange") { var sl = $("picSlider"); if (sl) sl.style.setProperty("--cut", ev.target.value + "%"); }
+  });
+  // Dragging on the picture itself moves the slider too
+  (function () {
+    var drag = false;
+    function at(ev) {
+      var sl = $("picSlider"); if (!sl) return;
+      var r = sl.getBoundingClientRect(), x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      var v = Math.max(0, Math.min(100, Math.round(x / r.width * 100)));
+      sl.style.setProperty("--cut", v + "%"); var rg = $("picRange"); if (rg) rg.value = v;
+    }
+    $("planBody").addEventListener("pointerdown", function (ev) { if (ev.target.closest("#picSlider")) { drag = true; at(ev); } });
+    window.addEventListener("pointermove", function (ev) { if (drag) at(ev); });
+    window.addEventListener("pointerup", function () { drag = false; });
+    window.addEventListener("pointercancel", function () { drag = false; });
+  })();
   $("planBody").addEventListener("change", function (ev) {
     var t = ev.target;
     if (t.id === "picFile" && t.files && t.files[0]) {
@@ -4046,6 +4187,7 @@ select.in { padding-right: 30px;
       } else { picsMode = "view"; picsViewId = id; picsDelArm = false; window.scrollTo(0, 0); }
       renderPics(); return;
     }
+    if (act === "cmp-side" || act === "cmp-slider") { picsCmpView = act.slice(4); renderPics(); return; }
     if (act === "cancel") { picsNew = null; picsMode = "grid"; renderPics(); return; }
     if (act === "save" && picsNew) {
       var p = { id: "p" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), date: picsNew.date, img: picsNew.img, createdAt: Date.now(), synced: false };
