@@ -555,6 +555,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .micro .mbar { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .micro .mbar i { display: block; height: 100%; border-radius: inherit; }
 .micro .mx { padding: 0 0 12px; color: var(--muted); font-size: 14px; } .micro .mx p { margin: 4px 0; } .micro .mx b { color: var(--fg); }
+.learn-h { font-family: var(--font-display); font-size: 20px; margin: 10px 4px 0; }
 .vh-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 
 /* Weight */
@@ -782,7 +783,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 42</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 43</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1593,9 +1594,9 @@ select.in { padding-right: 30px;
 
       return hero + sourcesHtml("protein") + how + tiers + need + speed + plant + hacks + aminos + src;
     },
-    carbs: function () { return macroHero("carbs", "Your main fuel", "Carbs are your body's main fuel, especially for hard training.") + sourcesHtml("carbs") + comingSoon("carbs"); },
-    fat: function () { return macroHero("fat", "Hormones and vitamins", "Fat is needed to make hormones and to absorb vitamins A, D, E and K.") + sourcesHtml("fat") + comingSoon("fat"); },
-    fiber: function () { return macroHero("fiber", "Digestion and fullness", "Fiber is the part of plants you don't digest. It helps digestion and keeps you full.") + sourcesHtml("fiber") + comingSoon("fiber"); }
+    carbs: function () { return macroHero("carbs", "Your main fuel", "Carbs are your body's main fuel, especially for hard training.") + sourcesHtml("carbs") + carbsInfo(); },
+    fat: function () { return macroHero("fat", "Hormones and vitamins", "Fat is needed to make hormones and to absorb vitamins A, D, E and K.") + sourcesHtml("fat") + fatInfo(); },
+    fiber: function () { return macroHero("fiber", "Digestion and fullness", "Fiber is the part of plants you don't digest. It helps digestion and keeps you full.") + sourcesHtml("fiber") + fiberInfo(); }
   };
   function macroInfo(key) { return MACROS.find(function (m) { return m.key === key; }); }
   function macroKicker(key) {
@@ -1611,6 +1612,78 @@ select.in { padding-right: 30px;
       '<div class="learn-stats"><div><div class="v num">' + fmtG(eaten) + '<small>g</small></div><div class="k">' + (selectedDate === dayKey() ? "Eaten today" : "Eaten that day") + '</div></div>' +
       '<div><div class="v num">' + fmt(TARGETS[key]) + '<small>g</small></div><div class="k">' + (realTargets() ? "Your daily target" : "Sample target") + '</div></div></div>' +
       '</section>';
+  }
+  // ---------- Carbs, fat and fiber info (from the Skill Tree doc, Levels 7 to 9, Nov 2026) ----------
+  function evTag(t) { return '<span class="ev">Evidence: ' + t + '</span>'; }
+  function kgNow() { var lb = currentWeight(); return lb ? lb * 0.453592 : null; }
+  function srcList(items) {
+    return '<ol class="src">' + items.map(function (x) { return '<li>' + (x[1] ? '<a href="' + x[1] + '" target="_blank" rel="noopener">' + x[0] + '</a>' : x[0]) + '</li>'; }).join("") + '</ol>';
+  }
+  function carbsInfo() {
+    var kg = kgNow(), rng = kg ? ' That\'s at least <b>' + fmt(3 * kg) + ' to ' + fmt(5 * kg) + ' g</b> for you.' : '';
+    return '<div class="section-h"><h2>Learn about carbs</h2></div>' +
+      learnSec("What carbs do", "Fuel for the hard sets",
+        '<ul><li><b>Fuel tank:</b> carbs refill glycogen, the fuel stored inside your muscles. Lots of hard sets drain it.</li>' +
+        '<li><b>Fuel, not bricks:</b> carbs don\'t add muscle building on top of protein. Adding 50 g of carbs to 25 g of whey made no difference to muscle building (Staples 2011). Their job is to power the training that does.</li>' +
+        '<li><b>Insulin myth:</b> insulin helps muscles take in amino acids, but protein raises insulin enough on its own. Adding carbs raised insulin 5-fold without more building.</li></ul>' + evTag("moderate")) +
+      learnSec("How much", "Your target fills the calories left over",
+        '<ul><li><b>In this app:</b> protein and fat are set first, and carbs fill the rest of your calories. Your target is <b>' + fmt(TARGETS.carbs) + ' g</b>.</li>' +
+        '<li><b>If you lift hard:</b> aim for at least 3 to 5 g per kg of body weight a day (Iraki 2019).' + rng + '</li>' +
+        '<li><b>Timing:</b> have a meal with protein and a good share of carbs within 1 to 2 hours before and after lifting.</li></ul>' + evTag("moderate")) +
+      learnSec("Is keto good for muscle?", "Not if muscle is the goal",
+        '<ul><li><b>Easy, long efforts:</b> after a few weeks of keto the body gets better at burning fat.</li>' +
+        '<li><b>Heavy sets:</b> they run on fast carb fuel. Fat can\'t be used fast enough to keep up.</li>' +
+        '<li><b>In lifters:</b> trained men on keto in a calorie surplus for 8 weeks lost a little fat but gained no muscle; the normal-carb group gained lean mass (Vargas 2018). A 2022 review found less lean mass and weaker strength results on keto on average.</li>' +
+        '<li><b>Burning fat isn\'t losing fat:</b> fat loss still comes from eating fewer calories than you burn.</li></ul>' + evTag("moderate: keto trials are few and small")) +
+      learnSec("Easy sources", "Rice, potatoes, oats, fruit",
+        '<p>Rice, potatoes, oats, fruit, bread and bagels, pasta, and whole-grain waffles. Whole grains, fruit and potatoes with skin also bring fiber.</p>') +
+      learnSec("Sources", "Where these facts come from", srcList([
+        ["Staples 2011: carbs added to protein", "https://pubmed.ncbi.nlm.nih.gov/21131864/"],
+        ["Iraki 2019: off-season bodybuilding nutrition", "https://pubmed.ncbi.nlm.nih.gov/31247944/"],
+        ["Vargas 2018: keto in trained men during a surplus", "https://doaj.org/article/c1e6e0c2a7674b6191881c1b547eda52"],
+        ["Stronger by Science 2022: keto meta-analysis breakdown", "https://www.strongerbyscience.com/research-spotlight-ketogenic-diets/"]
+      ]));
+  }
+  function fatInfo() {
+    var kg = kgNow(), rng = kg ? ' That\'s about <b>' + fmt(0.5 * kg) + ' to ' + fmt(1.5 * kg) + ' g</b> for you.' : '';
+    return '<div class="section-h"><h2>Learn about fat</h2></div>' +
+      learnSec("What fat does", "Hormones and vitamins",
+        '<ul><li><b>Hormones:</b> across 6 studies of 206 men, cutting fat from about 40% to 20% of calories lowered testosterone by 10 to 15% on average (Whittaker & Wu 2021).</li>' +
+        '<li><b>Vitamins:</b> vitamins A, D, E and K dissolve in fat, so some fat with meals helps you absorb them.</li></ul>' + evTag("moderate: 6 small, short studies")) +
+      learnSec("How much", "Not too low",
+        '<ul><li><b>In this app:</b> fat is 30% of your calories: <b>' + fmt(TARGETS.fat) + ' g</b> a day.</li>' +
+        '<li><b>Healthy range for lifters:</b> 0.5 to 1.5 g per kg of body weight a day (Iraki 2019).' + rng + '</li></ul>' + evTag("moderate")) +
+      learnSec("Myths", "Fat and protein, fish oil",
+        '<ul><li><b>Fat doesn\'t block protein:</b> the fat in whole eggs didn\'t slow how their protein was digested and absorbed (Trommelen 2019).</li>' +
+        '<li><b>Fish oil isn\'t a muscle shortcut:</b> 8 weeks of fish oil didn\'t boost muscle building from whey in young men. Eat fish for your health, not as a booster.</li></ul>' + evTag("moderate")) +
+      learnSec("Best sources", "Salmon, eggs, olive oil, avocado, nuts",
+        '<p>Salmon and other fatty fish, whole eggs, olive oil, avocado, nuts and seeds. Butter and cheese count too; use them in balance.</p>') +
+      learnSec("Sources", "Where these facts come from", srcList([
+        ["Whittaker & Wu 2021: low-fat diets and testosterone", "https://www.news-medical.net/news/20210409/Study-Low-fat-diets-reduce-mene28099s-testosterone-levels.aspx"],
+        ["Trommelen 2019: muscle building after meals and lifting (review)", "https://rd.springer.com/content/pdf/10.1007/s40279-019-01053-5.pdf"],
+        ["Iraki 2019: off-season bodybuilding nutrition", "https://pubmed.ncbi.nlm.nih.gov/31247944/"]
+      ]));
+  }
+  function fiberInfo() {
+    var st = state.settings, age = st.birth ? ageOn(st.birth) : null, male = st.sex === "male";
+    return '<div class="section-h"><h2>Learn about fiber</h2></div>' +
+      learnSec("What fiber does", "Digestion, gut and heart",
+        '<ul><li><b>Keeps things moving:</b> fiber keeps digestion regular and supports gut and heart health.</li>' +
+        '<li><b>Fills you up:</b> great when losing fat. When gaining, too much can make it hard to eat enough, and a big high-fiber meal right before lifting can leave you bloated.</li></ul>' + evTag("strong for health")) +
+      learnSec("How much", "14 g per 1,000 calories",
+        '<ul><li><b>In this app:</b> 14 g per 1,000 calories (the Dietary Guidelines): <b>' + fmt(TARGETS.fiber) + ' g</b> a day for you.' +
+          (male && age && age <= 30 ? ' The guideline for men 19 to 30 is 34 g.' : '') + '</li>' +
+        '<li><b>Ramp up slowly:</b> add no more than about 5 g a day, and drink more water as you go.</li></ul>' + evTag("guidelines")) +
+      learnSec("Does fiber block protein?", "Only a little",
+        '<ul><li>Adding wheat bran cut protein digestibility about 2%; whole fruits and vegetables instead of juices, about 9%.</li>' +
+        '<li>In human studies the drops were usually under 10%, and some of the "lost" protein was gut bacteria, not your food (FAO 1981).</li></ul>' + evTag("older: data mostly from the 1970s and 80s")) +
+      learnSec("Easy sources", "Berries, oats, beans, broccoli",
+        '<p>Berries, apples, pears, oats, potatoes with skin, broccoli, and beans in small portions. A cup of raspberries has about 8 g.</p>') +
+      learnSec("Sources", "Where these facts come from", srcList([
+        ["FAO 1981: fiber and protein digestibility", "https://www.fao.org/4/M2836e/M2836e00.htm"],
+        ["Fiber targets and ramp-up (Nutrition Insider)", "https://thenutritioninsider.com/wellness/how-much-fiber-per-day"],
+        ["Dietary Guidelines for Americans: 14 g per 1,000 calories", ""]
+      ]));
   }
   function comingSoon(key) {
     return '<section class="card learn-src"><h2>More about ' + macroInfo(key).label.toLowerCase() + ' is coming</h2><p class="sub" style="margin:4px 0 0">We\'re researching it first. The facts will show up here once they\'re checked.</p></section>';
