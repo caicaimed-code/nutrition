@@ -556,6 +556,12 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .micro .mbar i { display: block; height: 100%; border-radius: inherit; }
 .micro .mx { padding: 0 0 12px; color: var(--muted); font-size: 14px; } .micro .mx p { margin: 4px 0; } .micro .mx b { color: var(--fg); }
 .learn-h { font-family: var(--font-display); font-size: 20px; margin: 10px 4px 0; }
+.checkin-banner { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; margin-bottom: 12px; text-align: left; border: 1.5px solid var(--good); }
+.checkin-banner .ic { font-size: 24px; } .checkin-banner .t { flex: 1; min-width: 0; } .checkin-banner b { display: block; } .checkin-banner small { color: var(--muted); font-size: 13px; }
+.ck-big { font-size: 34px; }
+.ck-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ck-stats > div { background: var(--surface-2); border-radius: 12px; padding: 12px; }
+.ck-stats .v { font-size: 22px; font-weight: 700; } .ck-stats .v small { font-size: 13px; color: var(--muted); font-weight: 600; } .ck-stats .k { font-size: 12px; color: var(--muted); }
 .vh-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 
 /* Weight */
@@ -756,6 +762,8 @@ select.in { padding-right: 30px;
     </div>
   </header>
 
+  <button class="card checkin-banner" type="button" id="checkinBanner" hidden><span class="ic" aria-hidden="true">📊</span><span class="t"><b>Your weekly check-in is ready</b><small>See how your body is really responding</small></span><span class="chev" aria-hidden="true">›</span></button>
+
   <section class="card cal" aria-label="Calories">
     <span class="chip sample" title="Targets are samples until the Plan tab is set up">Sample target</span>
     <div class="ring-wrap">
@@ -783,7 +791,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 43</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 44</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -910,6 +918,7 @@ select.in { padding-right: 30px;
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   // The food day runs until 3 AM. Before 3 AM it is still "yesterday" for logging.
   var DAY_START_HOUR = 3;
+  var CK_DAYS = 21, CK_MIN_DAYS = 10, CK_MIN_WEIGHS = 4, CK_STEP = 250; // weekly check-in (see below)
   function foodNow() {
     var d = new Date();
     if (d.getHours() < DAY_START_HOUR) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12);
@@ -1224,6 +1233,7 @@ select.in { padding-right: 30px;
     $("nextDay").disabled = isToday;
     renderComplete();
     renderStreak(isToday);
+    $("checkinBanner").hidden = !(isToday && checkinDue());
     var ring = $("ring"), off = (CIRC * (1 - Math.min(pct, 1))).toFixed(2);
     // On target (within the cushion, graded like the calendar) the ring turns green
     var onTarget = t.kcal > 0 && t.kcal >= TARGETS.kcal - cushion() && statusFor(t.kcal, TARGETS.kcal, true, true) === "good";
@@ -3252,12 +3262,15 @@ select.in { padding-right: 30px;
     var s = settings, kg = weightLb * 0.453592, cm = s.heightIn * 2.54, age = ageOn(s.birth);
     var bmr = 10 * kg + 6.25 * cm - 5 * age + (s.sex === "female" ? -161 : 5);
     var act = ACTIVITY.find(function (a) { return a.id === s.activity; }) || ACTIVITY[2];
-    var maint = bmr * act.f;
-    return { bmr: bmr, maint: maint, age: age, paces: PACES.map(function (p) {
-      var k = p.pct != null ? maint * (1 + p.pct) : maint + p.delta;
-      return { pace: p, kcal: Math.round(k / 10) * 10 };
+    var formula = bmr * act.f;
+    // Weekly check-in: once accepted, the maintenance measured from the person's own log and weight replaces the formula
+    var est = s.maintEst && s.maintEst.kcal > 0 ? s.maintEst.kcal : null;
+    var maint = est || formula;
+    return { bmr: bmr, maint: maint, formula: formula, fromCheckin: !!est, age: age, paces: PACES.map(function (p) {
+      return { pace: p, kcal: paceKcal(p, maint) };
     }) };
   }
+  function paceKcal(p, maint) { var k = p.pct != null ? maint * (1 + p.pct) : maint + p.delta; return Math.round(k / 10) * 10; }
   // Protein per pound: 0.8 (standard) or 1.0 ("Max muscle", top of the range research supports)
   function proteinPerLb(s) { return s && s.proteinPerLb === 1 ? 1 : 0.8; }
   function macroTargets(kcal, weightLb, perLb) {
@@ -3526,7 +3539,7 @@ select.in { padding-right: 30px;
     var top = '<section class="card plan-card">' +
       '<div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Daily calorie target</div>' +
       '<div class="target-big num">' + fmt(TARGETS.kcal) + '<small>kcal</small></div>' +
-      '<p class="note">' + (!c ? "This is a sample target. Add your stats to get your own." : !goal ? "This is a sample target. Pick your goal to set your real one." : !hit ? "This is a sample target. Pick a pace to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day. " + goalNote[goal]) + '</p>' +
+      '<p class="note">' + (!c ? "This is a sample target. Add your stats to get your own." : !goal ? "This is a sample target. Pick your goal to set your real one." : !hit ? "This is a sample target. Pick a pace to set your real one." : "Maintenance is about " + fmt(c.maint) + " kcal a day" + (c.fromCheckin ? " (measured in your weekly check-in)" : "") + ". " + goalNote[goal]) + '</p>' +
       '</section>';
 
     var goals = '<section class="card plan-card" role="radiogroup" aria-label="Goal">' + GOALS.map(function (g) {
@@ -3595,6 +3608,7 @@ select.in { padding-right: 30px;
     else if (planView === "creatine") html = creatineView();
     else if (planView === "settings") html = settingsView();
     else if (planView === "pics") html = '<div id="picsBody"></div>';
+    else if (planView === "checkin") html = checkinView();
     else html = top + planBoxes(s, w, c, goal, hit, missing);
     if (setupStep && planView === setupStep) {
       var one = setupStep === "stats";
@@ -3605,7 +3619,7 @@ select.in { padding-right: 30px;
     }
     $("planBody").innerHTML = html ? '<div class="cal-page">' + html + '</div>' : '';
     if (planView === "pics") renderPics();
-    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import", creatine: "Creatine", settings: "Settings", pics: "Progress pics" };
+    var titles = { home: "Plan", goal: "Your goal", macros: "Macro targets", stats: "Your stats", backup: "Backup & import", creatine: "Creatine", settings: "Settings", pics: "Progress pics", checkin: "Weekly check-in" };
     $("planTitle").textContent = titles[planView];
     $("planTop").hidden = planView === "home";
     $("settingsBtn").hidden = planView !== "home";
@@ -3627,7 +3641,9 @@ select.in { padding-right: 30px;
     function box(id, title, sub) {
       return '<button class="card plan-box" type="button" data-pview="' + id + '"><span class="t"><b>' + title + '</b>' + sub + '</span><span class="chev" aria-hidden="true">›</span></button>';
     }
-    return box("goal", "Your goal", '<small>' + goalSub + '</small>') +
+    var ck = checkinData();
+    return (realTargets() ? box("checkin", "Weekly check-in", '<small>' + (checkinDue() ? '<span style="color:var(--good);font-weight:600">Ready now</span> · ' : '') + esc(ck.ok ? "Measured maintenance ≈ " + fmt(ck.tdee) + " kcal" : "Needs " + ck.need) + '</small>') : '') +
+      box("goal", "Your goal", '<small>' + goalSub + '</small>') +
       box("macros", "Macro targets", '<small>' + (realTargets() ? "In use" : "Samples for now") + '</small>' + mini) +
       box("stats", "Your stats", statsSub) +
       box("creatine", "Creatine", '<small>' + esc(crSummary()) + '</small>') +
@@ -3666,6 +3682,7 @@ select.in { padding-right: 30px;
     if (b.dataset.themeOpt) { setTheme(b.dataset.themeOpt); renderPlan(); return; }
     if (b.dataset.sizeOpt !== undefined) { setTextSize(b.dataset.sizeOpt); renderPlan(); return; }
     if (b.id === "setupNext") { setupNext(); return; }
+    if (b.dataset.ck) { checkinAct(b.dataset.ck); return; }
     if (b.id === "exportBtn") { exportData(); return; }
     if (b.dataset.fbtype) { // keep what's typed: just move the highlight
       fbType = b.dataset.fbtype;
@@ -4531,6 +4548,92 @@ select.in { padding-right: 30px;
   }
   document.addEventListener("visibilitychange", rollDay);
   setInterval(rollDay, 60000);
+
+  // ---------- Weekly check-in: measure real maintenance from the log and the scale ----------
+  // Over the last 21 full days: average calories on logged days, and the weight trend (straight-line fit of weigh-ins).
+  // Maintenance ≈ average eaten − (lb gained per day × 3,500 kcal). Needs 10+ logged days and 4+ weigh-ins over 10+ days.
+  // Days under half the target are skipped as probably not fully logged. A new estimate moves at most 250 kcal per check-in.
+  function checkinData() {
+    var end = addDays(dayKey(), -1), start = addDays(end, -(CK_DAYS - 1)), kcals = [];
+    for (var k = start; k <= end; k = addDays(k, 1)) {
+      var list = entriesFor(k); if (!list.length) continue;
+      var kc = totals(list).kcal;
+      if (kc >= TARGETS.kcal * 0.5) kcals.push(kc);
+    }
+    var ws = state.weights.filter(function (w) { return w.date >= start && w.date <= end; }).sort(function (a, b) { return a.date.localeCompare(b.date); });
+    var span = ws.length ? daysBetween(ws[0].date, ws[ws.length - 1].date) : 0;
+    var need = [];
+    if (kcals.length < CK_MIN_DAYS) need.push((CK_MIN_DAYS - kcals.length) + " more fully logged " + (CK_MIN_DAYS - kcals.length === 1 ? "day" : "days"));
+    if (ws.length < CK_MIN_WEIGHS || span < 10) need.push(ws.length < CK_MIN_WEIGHS ? (CK_MIN_WEIGHS - ws.length) + " more weigh-in" + (CK_MIN_WEIGHS - ws.length === 1 ? "" : "s") : "weigh-ins spread over 10+ days");
+    var out = { ok: !need.length, need: need.join(" and "), days: kcals.length, weighs: ws.length, start: start, end: end };
+    if (!out.ok) return out;
+    var avg = kcals.reduce(function (a, b) { return a + b; }, 0) / kcals.length;
+    // least-squares slope of weight vs day number
+    var xs = ws.map(function (w) { return daysBetween(start, w.date); }), ys = ws.map(function (w) { return w.lb; });
+    var mx = xs.reduce(function (a, b) { return a + b; }, 0) / xs.length, my = ys.reduce(function (a, b) { return a + b; }, 0) / ys.length;
+    var num = 0, den = 0;
+    xs.forEach(function (x, i) { num += (x - mx) * (ys[i] - my); den += (x - mx) * (x - mx); });
+    var slope = den ? num / den : 0; // lb per day
+    out.avg = avg; out.perWeek = slope * 7; out.tdee = Math.round((avg - slope * 3500) / 10) * 10;
+    out.sane = out.tdee >= 1000 && out.tdee <= 6000;
+    return out;
+  }
+  function checkinState() { var c = state.settings.checkin; return c && typeof c === "object" ? c : {}; }
+  function checkinDue() {
+    if (!realTargets()) return false;
+    var last = checkinState().last;
+    if (last && daysBetween(last, dayKey()) < 7) return false;
+    var d = checkinData(); return d.ok && d.sane;
+  }
+  function checkinPlan() {
+    var s = state.settings, w = currentWeight(), c = calc(s, w), hit = c && chosenPace(c, s), d = checkinData();
+    if (!hit || !d.ok || !d.sane) return { d: d, c: c, hit: hit };
+    var used = c.maint, moved = Math.max(used - CK_STEP, Math.min(used + CK_STEP, d.tdee));
+    return { d: d, c: c, hit: hit, newMaint: Math.round(moved / 10) * 10, capped: moved !== d.tdee, newKcal: paceKcal(hit.pace, moved) };
+  }
+  function checkinView() {
+    var pl = checkinPlan(), d = pl.d, s = state.settings;
+    var how = '<section class="card plan-card"><p class="note"><b style="color:var(--fg)">How this works.</b> Formulas guess your maintenance from height, age and activity, but everyone burns a little differently. ' +
+      'This looks at what you really ate on logged days over the last ' + CK_DAYS + ' days and how your weight moved, then works out the calories that would keep you the same (a pound is about 3,500 kcal). ' +
+      'It changes your target by at most ' + CK_STEP + ' kcal at a time, so one odd week can\'t throw it off, and only when you tap. Best results: weigh in most mornings and log everything.</p></section>';
+    if (!pl.hit) return '<section class="card plan-card"><p class="note">Set your stats and goal first.</p></section>';
+    if (!d.ok) {
+      return '<section class="card plan-card"><div class="ck-big">⏳</div><b style="font-size:17px">Not enough data yet</b>' +
+        '<p class="note">Still needed: <b style="color:var(--fg)">' + esc(d.need) + '</b> in the last ' + CK_DAYS + ' days.</p>' +
+        '<div class="ck-stats"><div><div class="v num">' + d.days + '<small>/' + CK_MIN_DAYS + '</small></div><div class="k">Fully logged days</div></div>' +
+        '<div><div class="v num">' + d.weighs + '<small>/' + CK_MIN_WEIGHS + '</small></div><div class="k">Weigh-ins</div></div></div></section>' + how;
+    }
+    if (!d.sane) return '<section class="card plan-card"><b>The numbers look off</b><p class="note">The estimate came out at ' + fmt(d.tdee) + ' kcal, which is outside a normal range. Some days may be missing food, or a weigh-in may be wrong. Check the Weight tab and keep logging.</p></section>' + how;
+    var diff = pl.newKcal - pl.hit.kcal, last = checkinState();
+    var change = diff === 0 ? "Your target is already right." : (diff > 0 ? "Raise" : "Lower") + " your target by " + fmt(Math.abs(diff)) + " kcal.";
+    return '<section class="card plan-card">' +
+      '<div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Your measured maintenance</div>' +
+      '<div class="target-big num">' + fmt(d.tdee) + '<small>kcal</small></div>' +
+      '<p class="note">The formula said ' + fmt(pl.c.formula) + ' kcal' + (pl.c.fromCheckin ? ', and your last check-in set ' + fmt(pl.c.maint) : '') + '.</p>' +
+      '<div class="ck-stats"><div><div class="v num">' + fmt(d.avg) + '</div><div class="k">Avg eaten (' + d.days + ' logged days)</div></div>' +
+      '<div><div class="v num">' + (d.perWeek > 0 ? "+" : d.perWeek < 0 ? "−" : "") + r1(Math.abs(d.perWeek)) + '<small> lb</small></div><div class="k">Weight change a week</div></div></div>' +
+      '</section>' +
+      '<section class="card plan-card"><b style="font-size:17px">' + change + '</b>' +
+      '<p class="note">For ' + esc(pl.hit.pace.label) + ': <b style="color:var(--fg)">' + fmt(pl.newKcal) + ' kcal</b> a day (now ' + fmt(pl.hit.kcal) + ').' + (pl.capped ? ' Moved ' + CK_STEP + ' kcal toward your measured number; the next check-in can move it more.' : '') +
+        (pl.newKcal < floorKcal() ? ' <span style="color:var(--warn)">That is under ' + fmt(floorKcal()) + ' kcal: check with your doctor before going this low.</span>' : '') + '</p>' +
+      (diff !== 0 ? '<button class="btn-sm" type="button" data-ck="use" style="width:100%">Use ' + fmt(pl.newKcal) + ' kcal</button>' : '') +
+      '<button class="btn-outline" type="button" data-ck="keep" style="width:100%">' + (diff !== 0 ? "Keep my current target" : "OK") + '</button>' +
+      (s.maintEst ? '<button class="link-btn" type="button" data-ck="formula" style="align-self:center">Go back to the formula</button>' : '') +
+      (last.last ? '<p class="note" style="margin:0;text-align:center">Last check-in: ' + esc(shortDate(last.last)) + '</p>' : '') +
+      '</section>' + how;
+  }
+  function checkinAct(a) {
+    var s = state.settings, pl = checkinPlan();
+    if (a === "use" && pl.newMaint) { s.maintEst = { kcal: pl.newMaint, date: dayKey(), measured: pl.d.tdee }; }
+    if (a === "formula") { s.maintEst = null; }
+    s.checkin = { last: dayKey(), tdee: pl.d && pl.d.tdee || null };
+    planChanged(); render();
+    if (a === "use") { openPlanView("home"); celebrate("✓", "Target updated: " + fmt(TARGETS.kcal) + " kcal", "var(--good)"); }
+    else if (a === "formula") toast("Back to the formula: " + fmt(TARGETS.kcal) + " kcal");
+    else { openPlanView("home"); toast("Kept your target. Next check-in in a week."); }
+  }
+  $("checkinBanner").addEventListener("click", function () { showTab("plan"); openPlanView("checkin"); });
+  window.__nutritionTest.checkinData = checkinData;
 
   // ---------- Welcome + first-time setup ----------
   // New people (no stats, nothing logged) see a welcome, then two guided steps (Your stats, Your goal)
