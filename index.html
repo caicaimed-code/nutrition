@@ -288,6 +288,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .sub-item .s { font-size: 12.5px; color: var(--muted); }
 .sub-item .stepper button { width: 32px; height: 32px; font-size: 18px; }
 .sub-item .stepper .q { min-width: 40px; }
+/* Edit screen for a logged meal or food */
+.edit-item { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.edit-item > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.edit-item > summary::-webkit-details-marker { display: none; }
+.edit-item > summary .t { flex: 1; min-width: 0; }
+.edit-item > summary b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.edit-item > summary small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.edit-item > summary .chev { color: var(--muted); font-size: 20px; transition: transform .15s; }
+.edit-item[open] > summary .chev { transform: rotate(90deg); }
+.edit-body { display: flex; flex-direction: column; gap: 12px; }
+.edit-item .edit-body { padding: 0 14px 14px; }
+.edit-note { font-size: 13px; color: var(--muted); line-height: 1.4; margin: 0; }
+.edit-rm { align-self: flex-start; color: var(--warn); font-weight: 600; font-size: 14px; padding: 6px 2px; }
 .check { font-size: 13px; color: var(--muted); }
 .check.warn { color: var(--warn); }
 .time-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }
@@ -799,7 +812,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 46</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 47</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1231,7 +1244,9 @@ select.in { padding-right: 30px;
     return p != null && p >= proteinMealMin() ? '<span class="pbadge" title="At least ' + proteinMealMin() + ' g protein">🥩 Protein-rich</span>' : '';
   }
   function againBox(key) {
-    return '<div class="edit-row"><button class="again-btn" type="button" data-again="' + esc(key) + '">↻ ' + (selectedDate === dayKey() ? "Log again" : "Log again today") + '</button></div>';
+    return '<div class="edit-row" style="justify-content:flex-start">' +
+      '<button class="again-btn" type="button" data-edit="' + esc(key) + '">✏️ Edit</button>' +
+      '<button class="again-btn" type="button" data-again="' + esc(key) + '">↻ ' + (selectedDate === dayKey() ? "Log again" : "Log again today") + '</button></div>';
   }
 
   function render() {
@@ -1396,6 +1411,7 @@ select.in { padding-right: 30px;
     var b = ev.target.closest("button");
     if (!b) return;
     var id, e;
+    if (b.dataset.edit) { openEdit(b.dataset.edit); return; }
     if (b.dataset.favstart) { saving = b.dataset.favstart; render(); var fi = $("favName"); if (fi) { fi.focus(); fi.select(); } return; }
     if (b.dataset.favcancel) { saving = null; render(); return; }
     if (b.dataset.again) {
@@ -1837,6 +1853,9 @@ select.in { padding-right: 30px;
   var results = null;        // { query, generic: [], branded: [], error }
   var searchTimer = null, searchCtrl = null, detailCtrl = null;
   var current = null;        // food being viewed: { fdcId, name, brand, dataType, per100, nutrients, units, unitIndex, qty, loading }
+  var editKey = null;        // logged meal or food open on the Edit screen: "g:<meal id>" or "e:<entry id>"
+  var editKind = "meal";     // Meal / Snack chosen on the Edit screen
+  var addTo = null;          // set while picking a food to add to the meal being edited: { key }
 
   // Items gathered for one meal before it is logged. Kept on this phone only until "Log meal".
   var TRAY_KEY = "dads-nutrition-tray";
@@ -1917,7 +1936,7 @@ select.in { padding-right: 30px;
   function renderSearchBody() {
     var q = $("search").value.trim();
     $("clearBtn").hidden = !q;
-    var trayBar = tray.items.length ? '<button class="custom-entry tray-bar" type="button" data-tray="1"><span class="ic" aria-hidden="true">🍽</span>' +
+    var trayBar = tray.items.length && !addTo ? '<button class="custom-entry tray-bar" type="button" data-tray="1"><span class="ic" aria-hidden="true">🍽</span>' +
       '<span class="t"><div class="n">Your ' + KINDS[sheetKind].toLowerCase() + ': ' + itemsText(tray.items.length) + ' · ' + fmt(totals(tray.items).kcal) + ' kcal</div>' +
       '<div class="m">Tap to review and log it, or add more below</div></span><span class="add" aria-hidden="true">›</span></button>' : '';
     var html = trayBar + suggestHtml(q) + '<button class="custom-entry" type="button" data-scan="1"><span class="ic" aria-hidden="true">▥</span>' +
@@ -2099,9 +2118,11 @@ select.in { padding-right: 30px;
   // ---------- Food detail ----------
   function showView(v) {
     view = v;
-    $("backBtn").hidden = v === "search";
+    $("backBtn").hidden = v === "search" || v === "edit";
     $("searchWrap").hidden = v !== "search";
-    $("sheetTitle").textContent = v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : v === "tray" ? "Your items" : v === "fix" ? "Fix from label" : "Add food";
+    $("kindSeg").hidden = v === "edit" || !!addTo;
+    $("doneBtn").textContent = v === "edit" || (addTo && v === "search") ? "Cancel" : "Done";
+    $("sheetTitle").textContent = v === "edit" ? (favSource(editKey || "e:0").length > 1 ? "Edit meal" : "Edit food") : v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : v === "tray" ? "Your items" : v === "fix" ? "Fix from label" : addTo ? "Add to meal" : "Add food";
     $("sheetTitle").hidden = v === "detail";
   }
 
@@ -2235,6 +2256,8 @@ select.in { padding-right: 30px;
   // One food alone: "Log meal". Several foods: "Add another item", then log them together from the tray.
   function footButtons(enabled) {
     var dis = enabled ? '' : ' disabled', kind = KINDS[sheetKind].toLowerCase();
+    // Adding to a logged meal from the Edit screen: one button, goes straight back to the meal
+    if (addTo) return '<div class="detail-foot"><button class="primary" type="button" id="addBtn" data-fixed="1"' + dis + '>Add to this ' + addToWord() + '</button></div>';
     if (tray.items.length) return '<div class="detail-foot"><button class="primary" type="button" id="trayBtn"' + dis + '>Add to ' + kind + ' (' + itemsText(tray.items.length) + ' so far)</button>' +
       '<button class="link-btn foot-alt" type="button" id="addBtn" data-fixed="1"' + dis + '>Log only this item</button></div>';
     return '<div class="detail-foot"><button class="primary" type="button" id="addBtn"' + dis + '>Log ' + kind + '</button>' +
@@ -2242,7 +2265,7 @@ select.in { padding-right: 30px;
   }
   function bindFoot(fn) {
     $("addBtn").addEventListener("click", function () { fn(false); });
-    $("trayBtn").addEventListener("click", function () { fn(true); });
+    if ($("trayBtn")) $("trayBtn").addEventListener("click", function () { fn(true); });
   }
   function setFootEnabled(on) { ["addBtn", "trayBtn"].forEach(function (id) { var b = $(id); if (b) b.disabled = !on; }); }
 
@@ -2274,12 +2297,14 @@ select.in { padding-right: 30px;
   function addCurrent(toTray) {
     if (!current || !(current.qty > 0)) return;
     var u = current.units[current.unitIndex];
-    (toTray === true ? addToTray : logEntry)({
+    var fields = {
       fdcId: current.fdcId, name: current.name, brand: current.brand, dataType: current.dataType, custom: current.custom || undefined,
       barcode: current.barcode || undefined,
       unitLabel: u.label, unitGrams: u.grams, qty: current.qty, approx: u.approx || undefined,
       per100: current.per100, nutrients: current.nutrients
-    });
+    };
+    if (addTo) { addToMeal([fields]); return; }
+    (toTray === true ? addToTray : logEntry)(fields);
   }
 
   function logEntry(fields) {
@@ -2413,6 +2438,10 @@ select.in { padding-right: 30px;
       }).join("") + '</ul>';
   }
   function useFavorite(f) {
+    if (addTo) { // adding to a logged meal: a saved meal's foods join it directly
+      if (f.kind === "meal") addToMeal(f.items.map(favFields)); else openDetailFromEntry(f.items[0]);
+      return;
+    }
     if (f.kind === "meal") {
       var wasEmpty = !tray.items.length;
       f.items.forEach(function (x) { tray.items.push(favFields(x)); });
@@ -2788,6 +2817,7 @@ select.in { padding-right: 30px;
 
   // ---------- Time field (shared by detail and custom) ----------
   function timeFieldHtml() {
+    if (addTo) return ''; // the food joins the meal's own time
     return '<div class="field"><label for="timeInput">Time eaten</label>' +
       '<input class="time-in" id="timeInput" type="time" value="' + esc(sheetTime) + '" style="height:50px;font-size:16px"></div>';
   }
@@ -2849,13 +2879,191 @@ select.in { padding-right: 30px;
     if (v.sugar != null) nutrients[2000] = v.sugar;
     if (v.sat != null) nutrients[1258] = v.sat;
     if (v.sodium != null) nutrients[1093] = v.sodium;
-    (toTray === true ? addToTray : logEntry)({
+    var fields = {
       custom: true, name: name, brand: "", dataType: "Custom",
       unitLabel: "serving", unitGrams: 100, qty: 1,
       per100: { kcal: v.kcal, protein: v.protein, carbs: v.carbs, fat: v.fat, fiber: v.fiber, est: false },
       nutrients: nutrients
-    });
+    };
+    if (addTo) { addToMeal([fields]); return; }
+    (toTray === true ? addToTray : logEntry)(fields);
   }
+
+  // ---------- Edit a logged meal or food ----------
+  // Change anything: name, amount, calories and macros, day, time, Meal/Snack. Add foods to it or take foods out.
+  // The numbers in the boxes are for the whole amount that was eaten. A blank box stays "not available".
+  var MACRO_KEYS = ["kcal", "protein", "carbs", "fat", "fiber"];
+  function editInput(box, f) { return box.querySelector('[data-f="' + f + '"]'); }
+  function editNum(e, k, label, color, big) {
+    var v = amountFor(e.per100 || {}, e.unitGrams * e.qty, k), id = "e_" + k + "_" + e.id;
+    return '<div class="field"><label for="' + id + '">' + (color ? '<span class="dot" style="--c:' + color + '"></span>' : '') + label + '</label>' +
+      '<div class="unit"><input id="' + id + '" data-f="' + k + '" type="text" inputmode="decimal" autocomplete="off"' + (big ? ' class="big"' : '') + ' placeholder="n/a" value="' + (v == null ? "" : r1(v)) + '"><span>' + (k === "kcal" ? "kcal" : "g") + '</span></div></div>';
+  }
+  function editBody(e, removable) {
+    var unitName = e.unitLabel === "serving" ? "servings" : isRawUnit(e.unitLabel) ? e.unitLabel : "× " + e.unitLabel;
+    return '<div class="edit-body">' +
+      '<div class="field"><label for="e_name_' + e.id + '">Name</label><input id="e_name_' + e.id + '" data-f="name" type="text" autocomplete="off" value="' + esc(e.name) + '"></div>' +
+      '<div class="field"><label for="e_qty_' + e.id + '">Amount (' + esc(unitName) + ')</label><input id="e_qty_' + e.id + '" data-f="qty" type="text" inputmode="decimal" autocomplete="off" value="' + esc(fmtQty(e.qty)) + '"></div>' +
+      '<p class="edit-note">Calories and macros below are for the whole amount you ate. Changing the amount updates the ones you haven\'t typed in.</p>' +
+      editNum(e, "kcal", "Calories", "", true) +
+      '<div class="grid2">' + editNum(e, "protein", "Protein", "var(--protein)") + editNum(e, "carbs", "Carbs", "var(--carbs)") + '</div>' +
+      '<div class="grid2">' + editNum(e, "fat", "Fat", "var(--fat)") + editNum(e, "fiber", "Fiber", "var(--fiber)") + '</div>' +
+      '<div class="check" data-check="1"></div>' +
+      (removable ? '<button class="edit-rm" type="button" data-erm="' + e.id + '">Remove this food</button>' : '') +
+    '</div>';
+  }
+  function addToWord() { var f = addTo && favSource(addTo.key)[0]; return f && f.kind === "snack" ? "snack" : "meal"; }
+
+  function openEdit(key) {
+    if (!favSource(key).length) return;
+    leaveScan(); current = null; addTo = null; editKey = key; saving = null;
+    showView("edit"); renderEdit(); $("sheetBody").scrollTop = 0;
+    if ($("sheet").hidden) revealSheet();
+  }
+  function renderEdit() {
+    var items = favSource(editKey);
+    if (!items.length) { closeSheet(); return; }
+    var first = items[0], group = items.length > 1;
+    editKind = first.kind === "snack" ? "snack" : "meal";
+    $("sheetTitle").textContent = group ? "Edit meal" : "Edit food";
+    $("sheetBody").innerHTML = '<div class="form edit-form">' +
+      (group ? '<div class="field"><label for="eMealName">Meal name (optional)</label><input id="eMealName" type="text" autocomplete="off" value="' + esc(first.mealName || "") + '" placeholder="' + esc(autoMealName(items)) + '"></div>' : '') +
+      items.map(function (e) {
+        if (!group) return '<div data-eid="' + e.id + '">' + editBody(e, false) + '</div>';
+        return '<details class="edit-item" data-eid="' + e.id + '"><summary><span class="t"><b>' + esc(e.name) + '</b><small>' + esc(servingText(e)) + ' · ' + fmt(entryValue(e, "kcal")) + ' kcal</small></span><span class="chev" aria-hidden="true">›</span></summary>' + editBody(e, true) + '</details>';
+      }).join("") +
+      '<button class="add-more-btn" type="button" id="eAdd"><span class="plus" aria-hidden="true">+</span>Add food to this ' + (editKind === "snack" ? "snack" : "meal") + '</button>' +
+      '<div class="grid2"><div class="field"><label for="eDate">Day</label><input id="eDate" type="date" max="' + esc(dayKey()) + '" value="' + esc(first.date) + '"></div>' +
+      '<div class="field"><label for="eTime">Time eaten</label><input id="eTime" type="time" value="' + esc(first.time || "") + '"></div></div>' +
+      '<div class="field"><label>Meal or snack</label><div class="seg" id="eKind" role="group" aria-label="Meal or snack">' +
+        '<button type="button" data-ekind="meal" aria-pressed="' + (editKind === "meal") + '">Meal</button>' +
+        '<button type="button" data-ekind="snack" aria-pressed="' + (editKind === "snack") + '">Snack</button></div></div>' +
+      '<div class="nut-card" id="eTotal"></div>' +
+      '<div class="detail-foot"><button class="primary" type="button" id="eSave">Save changes</button></div>' +
+    '</div>';
+    Array.prototype.forEach.call($("sheetBody").querySelectorAll("[data-eid]"), editCheck);
+    renderEditTotal();
+  }
+  function editValues(box) {
+    var v = {};
+    MACRO_KEYS.forEach(function (k) { v[k] = parseNum(editInput(box, k).value); });
+    return v;
+  }
+  function editCheck(box) {
+    var v = editValues(box), el = box.querySelector("[data-check]");
+    if (!el) return;
+    if (v.protein == null && v.carbs == null && v.fat == null) { el.textContent = ""; el.className = "check"; return; }
+    var fromMacros = (v.protein || 0) * 4 + (v.carbs || 0) * 4 + (v.fat || 0) * 9;
+    var off = v.kcal != null && v.kcal > 0 && Math.abs(fromMacros - v.kcal) / v.kcal > 0.2 && Math.abs(fromMacros - v.kcal) > 40;
+    el.className = "check" + (off ? " warn" : "");
+    el.textContent = "Macros add up to about " + fmt(fromMacros) + " kcal." + (off ? " That's far from the calories above, so double-check the numbers." : "");
+  }
+  function renderEditTotal() {
+    var sums = {};
+    Array.prototype.forEach.call($("sheetBody").querySelectorAll("[data-eid]"), function (box) {
+      var v = editValues(box);
+      MACRO_KEYS.forEach(function (k) { if (v[k] != null) sums[k] = (sums[k] || 0) + v[k]; });
+    });
+    var el = $("eTotal"); if (!el) return;
+    el.innerHTML = '<div class="nut-kcal"><div class="v num">' + (sums.kcal == null ? "–" : fmt(sums.kcal)) + '<small>kcal</small></div><div class="est">Total</div></div>' +
+      '<div class="nut-grid">' + nutCell("Protein", "var(--protein)", sums.protein == null ? null : sums.protein) + nutCell("Carbs", "var(--carbs)", sums.carbs == null ? null : sums.carbs) +
+      nutCell("Fat", "var(--fat)", sums.fat == null ? null : sums.fat) + nutCell("Fiber", "var(--fiber)", sums.fiber == null ? null : sums.fiber) + '</div>';
+  }
+  // Write the form back to the logged foods. Only numbers the person typed are changed; the rest keep their exact values.
+  function commitEdit() {
+    var items = favSource(editKey); if (!items.length) return false;
+    var group = items.length > 1, first = items[0];
+    var date = ($("eDate") || {}).value, time = ($("eTime") || {}).value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) date = first.date;
+    if (!validTime(time)) time = first.time;
+    var mealName = group && $("eMealName") ? $("eMealName").value.trim().slice(0, 60) : "";
+    items.forEach(function (e) {
+      var box = $("sheetBody").querySelector('[data-eid="' + e.id + '"]'); if (!box) return;
+      var name = editInput(box, "name").value.trim(); if (name) e.name = name.slice(0, 120);
+      var qty = parseNum(editInput(box, "qty").value); if (qty > 0) e.qty = qty;
+      var grams = e.unitGrams * e.qty, oldKcal = e.per100 && e.per100.kcal, p = Object.assign({}, e.per100 || {}), changedKcal = false;
+      MACRO_KEYS.forEach(function (k) {
+        var inp = editInput(box, k); if (!inp.dataset.touched) return;
+        var v = parseNum(inp.value);
+        p[k] = v == null ? null : Math.round(v / grams * 100 * 10000) / 10000;
+        if (k === "kcal") { changedKcal = true; p.est = false; }
+      });
+      e.per100 = p;
+      // Vitamins and minerals came with the old numbers. If calories moved a lot, they're probably wrong too, so they show "Not available".
+      if (changedKcal && !e.custom && oldKcal > 0 && p.kcal > 0 && Math.abs(oldKcal - p.kcal) / p.kcal > 0.15) e.nutrients = {};
+      e.date = date; e.time = time; e.kind = editKind;
+      if (group) { if (mealName) e.mealName = mealName; else delete e.mealName; }
+    });
+    save();
+    return true;
+  }
+  $("sheetBody").addEventListener("input", function (ev) {
+    if (view !== "edit") return;
+    var t = ev.target, box = t.closest && t.closest("[data-eid]");
+    if (!box || !t.dataset || !t.dataset.f) return;
+    if (t.dataset.f === "qty") {
+      var q = parseNum(t.value), e = findEntry(+box.dataset.eid);
+      if (q > 0 && e) MACRO_KEYS.forEach(function (k) {
+        var inp = editInput(box, k); if (inp.dataset.touched) return;
+        var v = amountFor(e.per100 || {}, e.unitGrams * q, k); inp.value = v == null ? "" : String(r1(v));
+      });
+    } else if (MACRO_KEYS.indexOf(t.dataset.f) >= 0) t.dataset.touched = "1";
+    editCheck(box); renderEditTotal();
+  });
+  $("sheetBody").addEventListener("click", function (ev) {
+    if (view !== "edit") return;
+    var b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.ekind) {
+      editKind = b.dataset.ekind;
+      Array.prototype.forEach.call($("eKind").querySelectorAll("button"), function (x) { x.setAttribute("aria-pressed", String(x.dataset.ekind === editKind)); });
+      var add = $("eAdd"); if (add) add.lastChild.textContent = "Add food to this " + editKind;
+      return;
+    }
+    if (b.id === "eSave") {
+      var firstDate = (favSource(editKey)[0] || {}).date;
+      if (!commitEdit()) return;
+      var moved = $("eDate") && /^\d{4}-\d{2}-\d{2}$/.test($("eDate").value) && $("eDate").value !== selectedDate && firstDate === selectedDate ? $("eDate").value : null;
+      expanded = null; render(); closeSheet();
+      toast(moved ? "Saved. Moved to " + shortDate(moved) : "Saved your changes");
+      return;
+    }
+    if (b.id === "eAdd") {
+      if (!commitEdit()) return;
+      expanded = null; render();
+      addTo = { key: editKey };
+      $("search").value = ""; results = null; current = null;
+      showView("search"); renderSearchBody(); $("sheetBody").scrollTop = 0;
+      return;
+    }
+    if (b.dataset.erm) {
+      var id = +b.dataset.erm, gone = findEntry(id); if (!gone) return;
+      commitEdit();
+      var gid = gone.meal;
+      state.entries = state.entries.filter(function (x) { return x.id !== id; });
+      var left = gid ? state.entries.filter(function (x) { return x.meal === gid; }).sort(function (a, b2) { return a.id - b2.id; }) : [];
+      save(); expanded = null; render();
+      toast("Removed " + shortName(gone.name));
+      if (!left.length) { closeSheet(); return; }
+      editKey = left.length > 1 ? "g:" + gid : "e:" + left[0].id;
+      showView("edit"); renderEdit();
+    }
+  });
+  // Foods picked while adding join the meal being edited, at its day and time, then back to the Edit screen
+  function addToMeal(list) {
+    var src = addTo ? favSource(addTo.key) : [];
+    if (!src.length) { closeSheet(); return; }
+    var first = src[0], gid = first.meal || "m" + Date.now().toString(36), id = nextId();
+    src.forEach(function (x) { x.meal = gid; });
+    list.forEach(function (f) {
+      var e = Object.assign({}, f, { id: id++, date: first.date, kind: first.kind, time: first.time, meal: gid });
+      if (first.mealName) e.mealName = first.mealName;
+      state.entries.push(e);
+    });
+    save(); expanded = null; render();
+    toast("Added " + (list.length === 1 ? shortName(list[0].name) : itemsText(list.length)));
+    openEdit("g:" + gid);
+  }
+  window.__nutritionTest.openEdit = openEdit;
 
   function backToSearch() {
     leaveScan();
@@ -2885,7 +3093,11 @@ select.in { padding-right: 30px;
     sheetTime = nowHHMM();
     $("search").value = "";
     results = null; current = null;
+    addTo = null; editKey = null;
     renderKind(); showView("search"); renderSearchBody();
+    revealSheet();
+  }
+  function revealSheet() {
     $("scrim").hidden = false; $("sheet").hidden = false;
     lockPage();
     requestAnimationFrame(function () { requestAnimationFrame(function () {
@@ -2901,6 +3113,7 @@ select.in { padding-right: 30px;
     $("search").blur();
     $("scrim").classList.remove("show"); $("sheet").classList.remove("show");
     unlockPage();
+    addTo = null; editKey = null;
     setTimeout(function () { $("scrim").hidden = true; $("sheet").hidden = true; }, 260);
   }
 
@@ -2960,14 +3173,17 @@ select.in { padding-right: 30px;
   })();
 
   $("logBtn").addEventListener("click", function () { if (currentTab !== "day") showTab("day"); openSheet(); });
-  $("doneBtn").addEventListener("click", closeSheet);
+  $("doneBtn").addEventListener("click", function () {
+    if (addTo && view === "search") { openEdit(addTo.key); return; } // "Cancel" while adding: back to the meal
+    closeSheet();
+  });
   $("backBtn").addEventListener("click", function () {
     if (view === "fix" && fixPrev) { current = fixPrev; fixPrev = null; showView("detail"); renderDetail(); return; }
     fixPrev = null; backToSearch();
   });
   $("scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !$("sheet").hidden) { if (view !== "search") backToSearch(); else closeSheet(); }
+    if (e.key === "Escape" && !$("sheet").hidden) { if (view === "edit") closeSheet(); else if (view !== "search") backToSearch(); else if (addTo) openEdit(addTo.key); else closeSheet(); }
   });
   $("kindSeg").addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-kind]"); if (!b) return;
