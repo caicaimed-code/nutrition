@@ -914,7 +914,7 @@ select.in { padding-right: 30px;
   var API = "https://api.nal.usda.gov/fdc/v1";
   // FatSecret goes through Caio's small middle server (worker/fatsecret-worker.js), which keeps the secret.
   // Empty = FatSecret off, and scans use USDA then Open Food Facts like before.
-  var FS_PROXY = "";
+  var FS_PROXY = "https://nutrition-fatsecret.caicaimed.workers.dev";
   var STORE_KEY = "dads-nutrition-v2";
 
   var KINDS = { meal: "Meal", snack: "Snack" };
