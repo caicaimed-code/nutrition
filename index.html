@@ -412,6 +412,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .nut-grid .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
 .nut-grid .dot { width: 7px; height: 7px; }
 .source { font-size: 12px; color: var(--muted); }
+.source a, .foot-note a { color: inherit; text-decoration: underline; }
 .fix-btn { height: auto; min-height: 44px; padding: 10px 12px; font-size: 14px; color: var(--fg); }
 .fix-link { align-self: flex-start; padding: 2px 0; }
 .fix-old { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.35; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
@@ -812,7 +813,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 47</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from <a href="https://www.fatsecret.com" target="_blank" rel="noopener">Powered by fatsecret</a>, USDA FoodData Central and Open Food Facts.<br><span id="cloudNote"></span><br><span id="appVersion">Version 48</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -911,6 +912,9 @@ select.in { padding-right: 30px;
   var YELLOW_BAND = 100;
   var API_KEY = "mW7hWGzTbNFGcDbCPKpmcfgq6NFwfgTRdcnzqJqT";
   var API = "https://api.nal.usda.gov/fdc/v1";
+  // FatSecret goes through Caio's small middle server (worker/fatsecret-worker.js), which keeps the secret.
+  // Empty = FatSecret off, and scans use USDA then Open Food Facts like before.
+  var FS_PROXY = "";
   var STORE_KEY = "dads-nutrition-v2";
 
   var KINDS = { meal: "Meal", snack: "Snack" };
@@ -2225,7 +2229,7 @@ select.in { padding-right: 30px;
         timeFieldHtml() +
         (current.dataWarn ? '<div class="data-warn" role="alert"><b>⚠️ Heads up.</b> ' + esc(current.dataWarn) + '</div>' : '') +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
-        '<div class="source">' + (current.fixed ? '✓ Your fix from the package label' + (current.fixDate ? ' (saved ' + esc(shortDate(current.fixDate)) + ')' : '') + '. Every scan of this barcode uses it.' : current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
+        '<div class="source">' + (current.fixed ? '✓ Your fix from the package label' + (current.fixDate ? ' (saved ' + esc(shortDate(current.fixDate)) + ')' : '') + '. Every scan of this barcode uses it.' : current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : current.dataType === "FatSecret" ? 'Source: <a href="https://www.fatsecret.com" target="_blank" rel="noopener">Powered by fatsecret</a>' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
         fixLinkHtml() +
         footButtons(qty > 0) +
       '</div>';
@@ -2587,6 +2591,7 @@ select.in { padding-right: 30px;
       if (view !== "scan") return;
       scanBusy = false;
       if (!found) showScanMissing(code, null);
+      else if (found.kind === "fs") openFsFood(found.food, code);
       else if (found.kind === "usda") { var it = found.item; it.__barcode = code; openDetailFromSearch(it); }
       else openOffProduct(found.product, code);
     }, function (err) {
@@ -2608,16 +2613,25 @@ select.in { padding-right: 30px;
       return d && d.status === 1 && d.product ? { kind: "off", product: d.product } : null;
     });
   }
-  // USDA first (same data as the rest of the app), then Open Food Facts. A failed lookup is reported, not hidden.
+  function fsByCode(code) {
+    if (!FS_PROXY) return Promise.resolve(null);
+    return fetchJSON(FS_PROXY + "/barcode?code=" + encodeURIComponent(code)).then(function (d) {
+      return d && d.food ? { kind: "fs", food: d.food } : null;
+    });
+  }
+  // FatSecret first (Caio's pick, Nov 12), then USDA, then Open Food Facts.
+  // If one database is down, the next one still gets asked. Only if none answers is the failure shown.
   function lookupBarcode(code) {
     var failed = null;
     function safe(p) { return p.catch(function (e) { failed = failed || e || {}; return null; }); }
     var variants = [code];
     if (code.length === 13 && code[0] === "0") variants.push(code.slice(1));
     else if (code.length === 12) variants.push("0" + code);
-    return variants.reduce(function (p, c) {
-      return p.then(function (f) { return f || safe(usdaByCode(c)); });
-    }, Promise.resolve(null)).then(function (f) {
+    return safe(fsByCode(code)).then(function (f0) {
+      return variants.reduce(function (p, c) {
+        return p.then(function (f) { return f || safe(usdaByCode(c)); });
+      }, Promise.resolve(f0));
+    }).then(function (f) {
       return f || safe(offByCode(code));
     }).then(function (f) {
       if (!f && failed) throw failed;
@@ -2669,6 +2683,58 @@ select.in { padding-right: 30px;
       dataWarn: scanDataWarning(per100, liquid || drinkByName)
     };
     applyScanDefault();
+    showView("detail"); renderDetail(); $("sheetBody").scrollTop = 0;
+  }
+
+  // ---------- FatSecret food ----------
+  // FatSecret gives nutrition per serving ("1 bar (40 g)"). The app keeps everything per 100 g/ml,
+  // so the numbers are scaled from the serving's weight. Missing values stay missing (shown as not available).
+  var FS_FIELDS = [["calories", 1008], ["protein", 1003], ["fat", 1004], ["carbohydrate", 1005], ["fiber", 1079], ["sugar", 2000],
+    ["saturated_fat", 1258], ["monounsaturated_fat", 1292], ["polyunsaturated_fat", 1293], ["trans_fat", 1257],
+    ["cholesterol", 1253], ["sodium", 1093], ["potassium", 1092]];
+  function fsList(x) { return !x ? [] : Array.isArray(x) ? x : [x]; }
+  function fsGrams(s) {
+    var a = parseFloat(s.metric_serving_amount), u = String(s.metric_serving_unit || "").toLowerCase();
+    if (!(a > 0)) return null;
+    if (u === "g" || u === "ml") return { grams: a, liquid: u === "ml" };
+    if (u === "oz") return { grams: a * 28.3495, liquid: false };
+    return null;
+  }
+  function fsParse(food) {
+    var servings = fsList(food && food.servings && food.servings.serving).filter(function (s) { return fsGrams(s); });
+    if (!servings.length) return null;
+    var base = servings.find(function (s) { return String(s.is_default) === "1"; }) || servings[0];
+    var bw = fsGrams(base), map = {};
+    FS_FIELDS.forEach(function (f) {
+      var raw = base[f[0]];
+      if (raw == null || String(raw).trim() === "") return;
+      var v = parseFloat(raw);
+      if (isFinite(v) && v >= 0) map[f[1]] = v * 100 / bw.grams;
+    });
+    var per100 = per100FromMap(map);
+    if (per100.kcal == null && per100.protein == null && per100.carbs == null && per100.fat == null) return null;
+    var liquid = bw.liquid, units = [], seen = {};
+    [base].concat(servings).forEach(function (s) {
+      var w = fsGrams(s), d = String(s.serving_description || "").trim();
+      if (!w || s.serving_id === "0" || !d || /^\d+(\.\d+)?\s*(g|ml|oz|fl oz)$/i.test(d)) return;
+      var label = d + " (" + r1(w.grams) + (w.liquid ? " ml" : " g") + ")";
+      if (seen[label]) return; seen[label] = 1;
+      units.push({ label: label, grams: w.grams });
+    });
+    units = units.concat(liquid ? [{ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 }] : [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }]);
+    return { per100: per100, nutrients: keepNutrients(map), units: units, liquid: liquid, hasServing: units.length > 2 };
+  }
+  window.__nutritionTest.fsParse = fsParse;
+  function openFsFood(food, code) {
+    var p = fsParse(food);
+    if (!p) { showScanMissing(code, null, "nodata", { product_name: food && food.food_name, brands: food && food.brand_name }); return; }
+    current = {
+      fdcId: null, name: niceName(food.food_name || "Scanned food"), brand: niceName(food.brand_name || ""),
+      dataType: "FatSecret", per100: p.per100, nutrients: p.nutrients, units: p.units,
+      unitIndex: p.hasServing ? 0 : p.units.findIndex(function (u) { return u.label === (p.liquid ? "ml" : "g"); }),
+      qty: p.hasServing ? 1 : 100, loading: false, touched: true, barcode: code,
+      dataWarn: scanDataWarning(p.per100, p.liquid)
+    };
     showView("detail"); renderDetail(); $("sheetBody").scrollTop = 0;
   }
 
