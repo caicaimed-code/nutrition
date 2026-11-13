@@ -399,6 +399,13 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .nut-grid .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
 .nut-grid .dot { width: 7px; height: 7px; }
 .source { font-size: 12px; color: var(--muted); }
+.fix-btn { height: auto; min-height: 44px; padding: 10px 12px; font-size: 14px; color: var(--fg); }
+.fix-link { align-self: flex-start; padding: 2px 0; }
+.fix-old { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.35; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.fix-old span { flex: 1; }
+.fix-intro { font-size: 14px; line-height: 1.45; color: var(--muted); margin: 0; }
+.fix-intro b { color: var(--fg); }
+.fix-hint { font-size: 12px; line-height: 1.4; color: var(--muted); margin-top: 6px; }
 .data-warn { font-size: 14px; line-height: 1.4; color: var(--fg); border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 12px; padding: 10px 12px; }
 .data-warn b { color: var(--warn); }
 .approx-note { font-size: 13px; line-height: 1.4; color: var(--muted); margin-top: -6px; }
@@ -792,7 +799,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 45</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 46</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -2094,11 +2101,13 @@ select.in { padding-right: 30px;
     view = v;
     $("backBtn").hidden = v === "search";
     $("searchWrap").hidden = v !== "search";
-    $("sheetTitle").textContent = v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : v === "tray" ? "Your items" : "Add food";
+    $("sheetTitle").textContent = v === "custom" ? "Custom food" : v === "scan" ? "Scan barcode" : v === "tray" ? "Your items" : v === "fix" ? "Fix from label" : "Add food";
     $("sheetTitle").hidden = v === "detail";
   }
 
   function openDetailFromSearch(item) {
+    var fxs = fixFor(item.__barcode || item.gtinUpc);
+    if (fxs) { openFromFix(fxs, item.__barcode || item.gtinUpc); return; }
     var map = mapFromSearch(item);
     current = {
       fdcId: item.fdcId,
@@ -2195,10 +2204,12 @@ select.in { padding-right: 30px;
         timeFieldHtml() +
         (current.dataWarn ? '<div class="data-warn" role="alert"><b>⚠️ Heads up.</b> ' + esc(current.dataWarn) + '</div>' : '') +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
-        '<div class="source">' + (current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
+        '<div class="source">' + (current.fixed ? '✓ Your fix from the package label' + (current.fixDate ? ' (saved ' + esc(shortDate(current.fixDate)) + ')' : '') + '. Every scan of this barcode uses it.' : current.custom ? 'Custom food you entered' : current.dataType === "Open Food Facts" ? 'Source: Open Food Facts (community data). Check it against the package.' : 'Source: USDA FoodData Central' + (typeName ? ' · ' + typeName : '')) + (current.loading ? ' · <span class="loading-line">loading serving sizes…</span>' : '') + '</div>' +
+        fixLinkHtml() +
         footButtons(qty > 0) +
       '</div>';
     bindTimeField();
+    bindFixLink();
 
     $("qtyInput").addEventListener("input", function () {
       var raw = this.value.replace(",", ".");
@@ -2540,6 +2551,8 @@ select.in { padding-right: 30px;
     scanBusy = true;
     if (stopScan) { try { stopScan(); } catch (e) {} stopScan = null; }
     if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) {}
+    var fx = fixFor(code);
+    if (fx) { scanBusy = false; openFromFix(fx, code); return; }
     scanMessage("Found " + code, "Looking it up…");
     lookupBarcode(code).then(function (found) {
       if (view !== "scan") return;
@@ -2639,9 +2652,138 @@ select.in { padding-right: 30px;
       '<div class="scan-wrap"><div class="state" style="padding-top:12px"><strong>' + esc(title) + '</strong>' + esc(text) + '</div>' +
       '<div class="detail-foot" style="display:flex;flex-direction:column;gap:10px;margin-top:14px">' +
       '<button class="primary" type="button" id="scanAgain">Scan again</button>' +
+      '<button class="btn-outline" type="button" id="scanFix">Add it from the label (remembered next scan)</button>' +
       '<button class="btn-outline" type="button" id="scanCustom">Add as custom food</button></div></div>';
     $("scanAgain").addEventListener("click", openScan);
+    $("scanFix").addEventListener("click", function () {
+      current = { name: kind === "nodata" ? niceName(prod.product_name || "") : "", brand: kind === "nodata" ? niceName(String(prod.brands || "").split(",")[0]) : "",
+        per100: {}, nutrients: {}, units: [{ label: "g", grams: 1 }], unitIndex: 0, qty: 0, barcode: code, dataType: "" };
+      openFix(true);
+    });
     $("scanCustom").addEventListener("click", openCustom);
+  }
+
+
+  // ---------- Fix from label ----------
+  // A scanned food whose numbers don't match the package can be corrected once. The fix is saved by barcode in
+  // settings.labelFixes (so it backs up and syncs to the person's other phones), and every later scan of that
+  // barcode, or a packaged-food search hit with that barcode, uses it instead of the database.
+  // { "<barcode without leading zeros>": { name, brand, grams, liquid, per100, nutrients, source, fdcId, date } }
+  var fixPrev = null;
+  function fixKey(code) { return String(code || "").replace(/\D/g, "").replace(/^0+/, ""); }
+  function fixList() { var f = state.settings.labelFixes; return f && typeof f === "object" && !Array.isArray(f) ? f : {}; }
+  function fixFor(code) { var k = fixKey(code); return k && k.length >= 7 ? fixList()[k] || null : null; }
+  function fixUnits(fx) {
+    var u = [{ label: "serving (" + r1(fx.grams) + (fx.liquid ? " ml" : " g") + ")", grams: fx.grams }];
+    return u.concat(fx.liquid ? [{ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 }] : [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }]);
+  }
+  function openFromFix(fx, code) {
+    current = {
+      fdcId: fx.fdcId || null, name: fx.name, brand: fx.brand || "", dataType: "Label fix", fixed: true, fixDate: fx.date,
+      per100: JSON.parse(JSON.stringify(fx.per100)), nutrients: JSON.parse(JSON.stringify(fx.nutrients || {})), units: fixUnits(fx), unitIndex: 0, qty: 1, loading: false, touched: true, barcode: code
+    };
+    showView("detail"); renderDetail(); $("sheetBody").scrollTop = 0;
+  }
+  // Logged foods with this barcode that still have different numbers than the fix
+  function staleFixEntries(code, fx) {
+    var k = fixKey(code);
+    return state.entries.filter(function (e) { return e.barcode && fixKey(e.barcode) === k && JSON.stringify(e.per100) !== JSON.stringify(fx.per100); });
+  }
+  function fixLinkHtml() {
+    if (!current || !current.barcode || current.custom) return '';
+    var html = '';
+    if (current.fixed) {
+      var fx = fixFor(current.barcode), n = fx ? staleFixEntries(current.barcode, fx).length : 0;
+      if (n) html += '<div class="fix-old"><span>You logged this ' + (n === 1 ? 'once' : n + ' times') + ' before the fix, with the old numbers.</span>' +
+        '<button class="btn-sm" type="button" id="fixOldBtn">Update ' + (n === 1 ? 'it' : 'them') + '</button></div>';
+      return html + '<button class="link-btn fix-link" type="button" id="fixBtn">✏️ Edit my label fix</button>';
+    }
+    return '<button class="btn-outline fix-btn" type="button" id="fixBtn">✏️ Numbers don\'t match the package? Fix from label</button>';
+  }
+  function bindFixLink() {
+    var b = $("fixBtn"); if (b) b.addEventListener("click", function () { openFix(false); });
+    var o = $("fixOldBtn"); if (o) o.addEventListener("click", function () {
+      var fx = fixFor(current.barcode); if (!fx) return;
+      var list = staleFixEntries(current.barcode, fx);
+      list.forEach(function (e) { e.per100 = JSON.parse(JSON.stringify(fx.per100)); e.nutrients = JSON.parse(JSON.stringify(fx.nutrients || {})); e.name = fx.name; if (fx.brand) e.brand = fx.brand; });
+      save(); render(); renderDetail();
+      toast("Updated " + itemsText(list.length) + " you already logged");
+    });
+  }
+  // The serving the person is looking at, as a starting point: "1 can (416 g)" or "416 g" both give 416
+  function fixServing() {
+    var u = current.units[current.unitIndex] || { label: "g", grams: 1 };
+    var liquid = u.label === "ml" || u.label === "fl oz" || /\bml\)/.test(u.label);
+    var grams = isRawUnit(u.label) ? u.grams * (current.qty || 0) : u.grams;
+    if (u.label === "fl oz") grams = 29.5735 * (current.qty || 0);
+    if (u.label === "ml") grams = current.qty || 0;
+    return { grams: grams > 0 ? r1(grams) : null, liquid: liquid };
+  }
+  function openFix(fromMissing) {
+    fixPrev = fromMissing ? null : current;
+    var sv = fixServing(), p = current.per100 || {};
+    function at(k) { var v = sv.grams && p[k] != null ? p[k] * sv.grams / 100 : null; return v == null ? "" : String(Math.round(v * 10) / 10); }
+    var nut = current.nutrients || {};
+    function atN(id, mult) { var v = sv.grams && nut[id] != null ? nut[id] * sv.grams / 100 * (mult || 1) : null; return v == null ? "" : String(Math.round(v * 10) / 10); }
+    showView("fix");
+    $("sheetBody").innerHTML =
+      '<div class="form fix-form">' +
+        '<p class="fix-intro">Copy the <b>Nutrition Facts</b> from the package, <b>for one serving</b>. ' + (fromMissing ? 'The app remembers it, so next time you scan this barcode it fills in by itself.' : 'We filled in what the database says. Change any number that\'s different.') + '</p>' +
+        '<div class="field"><label for="fName">Name</label><input id="fName" type="text" autocomplete="off" value="' + esc(current.name || "") + '" placeholder="For example: Medium chili"></div>' +
+        '<div class="field"><label for="fServ">Serving size on the label</label><div class="amount" style="margin:0">' +
+          '<input id="fServ" type="text" inputmode="decimal" autocomplete="off" placeholder="For example: 416" value="' + (sv.grams || "") + '">' +
+          '<select id="fUnit" aria-label="Serving unit"><option value="g"' + (sv.liquid ? '' : ' selected') + '>g</option><option value="ml"' + (sv.liquid ? ' selected' : '') + '>ml</option></select></div>' +
+          '<div class="fix-hint">The number in brackets, like "1 can (416g)". If the label has two columns (per cup and per container), use the one you\'ll eat and its grams.</div></div>' +
+        numField("cKcal", "Calories", "kcal", "", true) +
+        '<div class="grid2">' + numField("cProtein", "Protein", "g", "var(--protein)") + numField("cCarbs", "Carbs", "g", "var(--carbs)") + '</div>' +
+        '<div class="grid2">' + numField("cFat", "Fat", "g", "var(--fat)") + numField("cFiber", "Fiber", "g", "var(--fiber)") + '</div>' +
+        '<button class="more-btn" type="button" id="moreBtn">+ Sugar, saturated fat, sodium</button>' +
+        '<div class="grid2" id="moreFields" hidden>' + numField("cSugar", "Sugar", "g") + numField("cSat", "Saturated fat", "g") + numField("cSodium", "Sodium", "mg") + '</div>' +
+        '<div class="check" id="cCheck"></div>' +
+        '<div class="detail-foot"><button class="primary" type="button" id="fixSave" disabled>Save fix</button>' +
+        (current.fixed ? '<button class="link-btn foot-alt" type="button" id="fixRemove">Remove my fix (use the database again)</button>' : '') + '</div>' +
+      '</div>';
+    $("cKcal").value = at("kcal"); $("cProtein").value = at("protein"); $("cCarbs").value = at("carbs"); $("cFat").value = at("fat"); $("cFiber").value = at("fiber");
+    $("cSugar").value = atN(2000); $("cSat").value = atN(1258); $("cSodium").value = atN(1093);
+    $("sheetBody").scrollTop = 0;
+    $("moreBtn").addEventListener("click", function () { $("moreFields").hidden = false; this.hidden = true; });
+    var form = $("sheetBody").querySelector(".fix-form");
+    function check() { checkCustom(); var g = parseNum($("fServ").value); $("fixSave").disabled = !(g > 0 && parseNum($("cKcal").value) != null); }
+    form.addEventListener("input", check); check();
+    $("fixSave").addEventListener("click", saveFix);
+    var rm = $("fixRemove"); if (rm) rm.addEventListener("click", function () {
+      var list = Object.assign({}, fixList()); delete list[fixKey(current.barcode)];
+      state.settings.labelFixes = list; save();
+      var code = current.barcode; fixPrev = null;
+      toast("Removed your fix. Looking it up again…");
+      showView("scan"); $("sheetBody").innerHTML = '<div class="scan-wrap"><div class="scan-msg" id="scanMsg">Looking it up…</div><p class="scan-sub" id="scanSub"></p></div>';
+      onBarcode(code);
+    });
+    if (fromMissing) setTimeout(function () { var n = $("fName"); if (n) n.focus(); }, 280);
+  }
+  // Per serving (from the label) to per 100 g. A blank box stays "not available"; nothing is guessed.
+  function fixRecord(v, grams, liquid, name, base) {
+    function per(x) { return x == null ? null : Math.round(x / grams * 100 * 1000) / 1000; }
+    var per100 = { kcal: per(v.kcal), protein: per(v.protein), carbs: per(v.carbs), fat: per(v.fat), fiber: per(v.fiber), est: false };
+    // Vitamins and minerals come from the database. Keep them only if the database was close (within 15% on calories);
+    // if it was far off, its other numbers are likely off too, so they show as not available instead.
+    var old = base.per100 || {}, nutrients = {};
+    if (old.kcal > 0 && per100.kcal > 0 && Math.abs(old.kcal - per100.kcal) / per100.kcal <= 0.15) nutrients = JSON.parse(JSON.stringify(base.nutrients || {}));
+    [[2000, v.sugar], [1258, v.sat], [1093, v.sodium]].forEach(function (x) { if (x[1] != null) nutrients[x[0]] = per(x[1]); else if (!(old.kcal > 0 && per100.kcal > 0 && Math.abs(old.kcal - per100.kcal) / per100.kcal <= 0.15)) delete nutrients[x[0]]; });
+    return { name: name, brand: base.brand || "", grams: grams, liquid: liquid, per100: per100, nutrients: nutrients,
+      source: base.fixed ? (fixFor(base.barcode) || {}).source || "" : base.dataType || "", fdcId: base.fdcId || null, date: dayKey() };
+  }
+  window.__nutritionTest.fixRecord = fixRecord;
+  function saveFix() {
+    var v = customValues(), grams = parseNum($("fServ").value);
+    if (!(grams > 0) || v.kcal == null || !current || !current.barcode) return;
+    var name = $("fName").value.trim() || current.name || "Scanned food";
+    var rec = fixRecord(v, grams, $("fUnit").value === "ml", name, current);
+    var list = Object.assign({}, fixList()); list[fixKey(current.barcode)] = rec;
+    state.settings.labelFixes = list; save();
+    var code = current.barcode; fixPrev = null;
+    openFromFix(rec, code);
+    toast("Fixed. Every scan of this barcode now uses the label");
   }
 
   // ---------- Time field (shared by detail and custom) ----------
@@ -2819,7 +2961,10 @@ select.in { padding-right: 30px;
 
   $("logBtn").addEventListener("click", function () { if (currentTab !== "day") showTab("day"); openSheet(); });
   $("doneBtn").addEventListener("click", closeSheet);
-  $("backBtn").addEventListener("click", backToSearch);
+  $("backBtn").addEventListener("click", function () {
+    if (view === "fix" && fixPrev) { current = fixPrev; fixPrev = null; showView("detail"); renderDetail(); return; }
+    fixPrev = null; backToSearch();
+  });
   $("scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !$("sheet").hidden) { if (view !== "search") backToSearch(); else closeSheet(); }
