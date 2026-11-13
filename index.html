@@ -401,6 +401,7 @@ input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .source { font-size: 12px; color: var(--muted); }
 .data-warn { font-size: 14px; line-height: 1.4; color: var(--fg); border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 12px; padding: 10px 12px; }
 .data-warn b { color: var(--warn); }
+.approx-note { font-size: 13px; line-height: 1.4; color: var(--muted); margin-top: -6px; }
 .detail-foot { position: sticky; bottom: 0; background: linear-gradient(to top, var(--surface) 75%, transparent); padding-top: 12px; }
 .loading-line { font-size: 12px; color: var(--muted); }
 
@@ -791,7 +792,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 44</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from USDA FoodData Central.<br><span id="cloudNote"></span><br><span id="appVersion">Version 45</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -1013,12 +1014,20 @@ select.in { padding-right: 30px;
     });
     return found;
   }
+  // Some databases list a drink's serving in grams. If the name clearly says it is a drink, ml and fl oz are offered too,
+  // counted as 1 ml = 1 g (exact for water, within a few percent for juice, milk and soda) and marked "approx".
+  var DRINK_RE = /\b(juices?|beverages?|drinks?|sodas?|colas?|lemonades?|kombucha|smoothies?|kefir|milk|teas?|coffees?|water|cider|shakes?)\b/i;
+  var NOT_DRINK_RE = /\b(cakes?|cookies?|biscuits?|bars?|bread|candy|candies|chocolate|cereal|crackers?|chips|gum|gummy|gummies|jelly|jam|pudding|ice cream|yogurt|yoghurt|cheese|butter|powders?|mix|pods?|capsules?|bags?|packets?|dried|dry|concentrate|syrup|extract|tablets?|chestnuts?|snacks?|pie|muffins?|donuts?|doughnuts?|granola|beans|grounds)\b/i;
+  function drinkGuess(text) {
+    text = String(text || "");
+    return DRINK_RE.test(text) && !NOT_DRINK_RE.test(text);
+  }
   function buildUnits(food) {
     var units = [], seen = {};
-    function add(label, grams) {
+    function add(label, grams, approx) {
       var key = String(label).toLowerCase().replace(/[^a-z0-9]/g, "");
       if (!label || !(grams > 0) || seen[key]) return;
-      seen[key] = 1; units.push({ label: label, grams: grams });
+      seen[key] = 1; units.push(approx ? { label: label, grams: grams, approx: true } : { label: label, grams: grams });
     }
     var su = String(food.servingSizeUnit || "g").toLowerCase();
     var liquid = su === "ml" || su === "mlt";
@@ -1044,6 +1053,7 @@ select.in { padding-right: 30px;
       add("g", 1); add("oz", 28.3495);
       var dens = densityFromPortions(food.foodPortions);
       if (dens) { add("ml", dens); add("fl oz", 29.5735 * dens); }
+      else if (drinkGuess(food.description)) { add("ml", 1, true); add("fl oz", 29.5735, true); }
     }
     return units;
   }
@@ -1065,7 +1075,7 @@ select.in { padding-right: 30px;
   }
 
   // Exposed for automated checks only
-  window.__nutritionTest = { per100FromMap: per100FromMap, mapFromSearch: mapFromSearch, mapFromDetail: mapFromDetail, buildUnits: buildUnits, totals: totals, niceName: niceName, servingText: servingText };
+  window.__nutritionTest = { per100FromMap: per100FromMap, mapFromSearch: mapFromSearch, mapFromDetail: mapFromDetail, buildUnits: buildUnits, drinkGuess: drinkGuess, totals: totals, niceName: niceName, servingText: servingText };
 
   // ---------- Storage ----------
   function defaultSettings() {
@@ -2141,11 +2151,11 @@ select.in { padding-right: 30px;
   }
 
   function openDetailFromEntry(e) {
-    var units = [{ label: e.unitLabel, grams: e.unitGrams }];
+    var units = [e.approx ? { label: e.unitLabel, grams: e.unitGrams, approx: true } : { label: e.unitLabel, grams: e.unitGrams }];
     if (!e.custom) {
       var perMl = e.unitLabel === "ml" ? e.unitGrams : e.unitLabel === "fl oz" ? e.unitGrams / 29.5735 : null;
       var alts = [{ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 }];
-      if (perMl) alts = [{ label: "ml", grams: perMl }, { label: "fl oz", grams: 29.5735 * perMl }].concat(alts);
+      if (perMl) alts = [{ label: "ml", grams: perMl, approx: e.approx || undefined }, { label: "fl oz", grams: 29.5735 * perMl, approx: e.approx || undefined }].concat(alts);
       alts.forEach(function (u) { if (u.label !== e.unitLabel) units.push(u); });
     }
     current = {
@@ -2181,6 +2191,7 @@ select.in { padding-right: 30px;
             return '<option value="' + i + '"' + (i === current.unitIndex ? ' selected' : '') + '>' + esc(x.label) + '</option>';
           }).join("") + '</select>' +
         '</div>' +
+        (u.approx ? '<div class="approx-note">≈ Counted as 1 ml = 1 g, because the database gave this drink in grams. Close for drinks, but not exact.</div>' : '') +
         timeFieldHtml() +
         (current.dataWarn ? '<div class="data-warn" role="alert"><b>⚠️ Heads up.</b> ' + esc(current.dataWarn) + '</div>' : '') +
         '<div class="nut-card" id="nutCard">' + nutHtml(kcal, grams) + '</div>' +
@@ -2201,7 +2212,8 @@ select.in { padding-right: 30px;
       var prev = current.units[current.unitIndex];
       current.unitIndex = +this.value;
       var next = current.units[current.unitIndex];
-      if (isRawUnit(next.label) !== isRawUnit(prev.label) || (next.label === "g") !== (prev.label === "g")) current.qty = defaultQty(next);
+      var small = function (l) { return l === "g" || l === "ml"; };
+      if (isRawUnit(next.label) !== isRawUnit(prev.label) || small(next.label) !== small(prev.label)) current.qty = defaultQty(next);
       current.touched = true; current.userEdited = true;
       $("qtyInput").value = fmtQty(current.qty);
       updateNut();
@@ -2224,8 +2236,9 @@ select.in { padding-right: 30px;
   function setFootEnabled(on) { ["addBtn", "trayBtn"].forEach(function (id) { var b = $(id); if (b) b.disabled = !on; }); }
 
   function amountText(u, qty, grams) {
-    if (u.label === "ml") return fmtG(qty) + " ml";
-    if (u.label === "fl oz") return fmtG(qty * 29.5735) + " ml";
+    var about = u.approx ? "≈ " : "";
+    if (u.label === "ml") return about + fmtG(qty) + " ml";
+    if (u.label === "fl oz") return about + fmtG(qty * 29.5735) + " ml";
     return fmtG(grams) + " g";
   }
   function nutHtml(kcal, grams) {
@@ -2253,7 +2266,7 @@ select.in { padding-right: 30px;
     (toTray === true ? addToTray : logEntry)({
       fdcId: current.fdcId, name: current.name, brand: current.brand, dataType: current.dataType, custom: current.custom || undefined,
       barcode: current.barcode || undefined,
-      unitLabel: u.label, unitGrams: u.grams, qty: current.qty,
+      unitLabel: u.label, unitGrams: u.grams, qty: current.qty, approx: u.approx || undefined,
       per100: current.per100, nutrients: current.nutrients
     });
   }
@@ -2328,7 +2341,7 @@ select.in { padding-right: 30px;
   // ---------- Favorites: single foods and saved meals ----------
   // Stored in settings.saved, so they back up and sync like the rest of the plan.
   // Each: { id, name, kind: "food" | "meal", items: [food fields: name, serving, amount, nutrition] }
-  var FAV_FIELDS = ["fdcId", "name", "brand", "dataType", "custom", "barcode", "unitLabel", "unitGrams", "qty", "per100", "nutrients"];
+  var FAV_FIELDS = ["fdcId", "name", "brand", "dataType", "custom", "barcode", "unitLabel", "unitGrams", "approx", "qty", "per100", "nutrients"];
   function favFields(e) {
     var o = {};
     FAV_FIELDS.forEach(function (k) { if (e[k] !== undefined) o[k] = JSON.parse(JSON.stringify(e[k])); });
@@ -2422,7 +2435,9 @@ select.in { padding-right: 30px;
     var gi = current.units.findIndex(function (u) { return u.label === "g"; });
     // Liquids (serving listed in ml) start in ml; everything else in grams
     var liquidServing = current.units[0] && /\bml\)/.test(current.units[0].label);
-    var i = liquidServing && want >= 0 ? want : gi;
+    // A drink the database listed in grams (ml offered as approx) also starts in ml
+    var drinkByName = want >= 0 && current.units[want].approx;
+    var i = (liquidServing || drinkByName) && want >= 0 ? want : gi;
     if (i < 0) return;
     current.unitIndex = i;
     current.qty = current.scanDefault.amount;
@@ -2598,14 +2613,18 @@ select.in { padding-right: 30px;
     var liquid = /\b(ml|cl|dl|l|fl\.? ?oz)\b/.test(sizeText);
     var sq = parseFloat(prod.serving_quantity);
     var units = [];
+    var drinkByName = !liquid && drinkGuess((prod.product_name || "") + " " + (prod.brands || ""));
     if (sq > 0) units.push({ label: "serving (" + r1(sq) + (liquid ? " ml" : " g") + ")", grams: sq });
     if (liquid) units.push({ label: "ml", grams: 1 }, { label: "fl oz", grams: 29.5735 });
-    else units.push({ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 });
+    else {
+      if (drinkByName) units.push({ label: "ml", grams: 1, approx: true }, { label: "fl oz", grams: 29.5735, approx: true });
+      units.push({ label: "g", grams: 1 }, { label: "oz", grams: 28.3495 });
+    }
     current = {
       fdcId: null, name: niceName(prod.product_name || "Scanned food"), brand: niceName(String(prod.brands || "").split(",")[0]),
       dataType: "Open Food Facts", per100: per100, nutrients: {}, units: units, unitIndex: 0, qty: 100, loading: false,
       barcode: code, scanDefault: { amount: sq > 0 ? sq : 100 },
-      dataWarn: scanDataWarning(per100, liquid)
+      dataWarn: scanDataWarning(per100, liquid || drinkByName)
     };
     applyScanDefault();
     showView("detail"); renderDetail(); $("sheetBody").scrollTop = 0;
@@ -3479,7 +3498,7 @@ select.in { padding-right: 30px;
 
   // ---------- Ideas and feedback (emailed to Caio through his own Google Apps Script) ----------
   // The script sends the email to the account that deployed it, so no email address is in this public code.
-  var FEEDBACK_URL = "";
+  var FEEDBACK_URL = "https://script.google.com/macros/s/AKfycbxKj-IsFGMNAJJIZ4yrHbJaT8ptuyA_4-pwOqM2unawSeKEVQIxeDIueFRJpy7Uf7VT/exec";
   var FB_QUEUE = "dads-nutrition-feedback";
   var fbType = "Idea";
   function feedbackHtml() {
