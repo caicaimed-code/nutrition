@@ -813,7 +813,7 @@ select.in { padding-right: 30px;
   <div id="meals"></div>
   <section class="card complete" id="completeBox" hidden></section>
 
-  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from <a href="https://www.fatsecret.com" target="_blank" rel="noopener">Powered by fatsecret</a>, USDA FoodData Central and Open Food Facts.<br><span id="cloudNote"></span><br><span id="appVersion">Version 48</span></p>
+  <p class="foot-note"><span id="targetNote">Targets are samples until the Plan tab is set up.</span><br>Food data from <a href="https://www.fatsecret.com" target="_blank" rel="noopener">Powered by fatsecret</a>, USDA FoodData Central and Open Food Facts.<br><span id="cloudNote"></span><br><span id="appVersion">Version 49</span></p>
 </div>
 
 <div class="app cal-page" id="calPage" hidden>
@@ -2619,18 +2619,19 @@ select.in { padding-right: 30px;
       return d && d.food ? { kind: "fs", food: d.food } : null;
     });
   }
-  // FatSecret first (Caio's pick, Nov 12), then USDA, then Open Food Facts.
-  // If one database is down, the next one still gets asked. Only if none answers is the failure shown.
+  // USDA first, then FatSecret, then Open Food Facts. (Caio first picked FatSecret first on Nov 12, then switched on Nov 13:
+  // FatSecret gave the wrong food for two scanned barcodes.) If one database is down, the next one still gets asked.
+  // Only if none answers is the failure shown.
   function lookupBarcode(code) {
     var failed = null;
     function safe(p) { return p.catch(function (e) { failed = failed || e || {}; return null; }); }
     var variants = [code];
     if (code.length === 13 && code[0] === "0") variants.push(code.slice(1));
     else if (code.length === 12) variants.push("0" + code);
-    return safe(fsByCode(code)).then(function (f0) {
-      return variants.reduce(function (p, c) {
-        return p.then(function (f) { return f || safe(usdaByCode(c)); });
-      }, Promise.resolve(f0));
+    return variants.reduce(function (p, c) {
+      return p.then(function (f) { return f || safe(usdaByCode(c)); });
+    }, Promise.resolve(null)).then(function (f) {
+      return f || safe(fsByCode(code));
     }).then(function (f) {
       return f || safe(offByCode(code));
     }).then(function (f) {
